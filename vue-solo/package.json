@@ -1,0 +1,14 @@
+{
+  "name": "fantasy-map-generator",
+  "version": "0.1.0",
+  "author": "azgaar",
+  "homepage": "https://github.com/Azgaar/Fantasy-Map-Generator",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "browser-sync start --server 'src' --files 'src' --single"
+  },
+  "devDependencies": {
+    "browser-sync": "^2.24.1"
+  }
+}
