@@ -1862,6 +1862,15 @@
 </template>
 
 <script>
+import seedrandom from 'seedrandom'
+import * as d3 from 'd3'
+import * as d3chromatic from 'd3-scale-chromatic'
+import * as polylabel from 'polylabel'
+import * as quantize from 'quantize'
+import * as PriorityQueue from 'js-priority-queue'
+import * as $ from 'jquery'
+import 'jquery-ui-bundle'
+import 'jquery-ui-bundle/jquery-ui.css'
 
 /* eslint-disable */
 
@@ -1995,8 +2004,8 @@ function fantasyMap() {
   const ctx = canvas.getContext('2d')
 
   // Color schemes
-  let color = d3.scaleSequential(d3.interpolateSpectral)
-  const colors8 = d3.scaleOrdinal(d3.schemeSet2)
+  let color = d3.scaleSequential(d3chromatic.interpolateSpectral)
+  const colors8 = d3.scaleOrdinal(d3chromatic.schemeSet2)
   const colors20 = d3.scaleOrdinal(d3.schemeCategory20)
 
   // D3 drag and zoom behavior
@@ -2189,7 +2198,7 @@ function fantasyMap() {
     seed = params.get('seed') || Math.floor(Math.random() * 1e9)
     console.log(' seed: ' + seed)
     optionsSeed.value = seed
-    Math.seedrandom(seed)
+    seedrandom(seed)
   }
 
   // generate new map seed
@@ -2197,7 +2206,7 @@ function fantasyMap() {
     seed = Math.floor(Math.random() * 1e9)
     console.log(' seed: ' + seed)
     optionsSeed.value = seed
-    Math.seedrandom(seed)
+    seedrandom(seed)
   }
 
   function updateURL() {
@@ -3205,7 +3214,7 @@ function fantasyMap() {
   // Mark features (ocean, lakes, islands)
   function markFeatures() {
     console.time('markFeatures')
-    Math.seedrandom(seed) // reset seed to get the same result on heightmap edit
+    seedrandom(seed) // reset seed to get the same result on heightmap edit
     for (let i = 0, queue = [0]; queue.length > 0; i++) {
       const cell = cells[queue[0]]
       cell.fn = i // feature number
@@ -3560,7 +3569,7 @@ function fantasyMap() {
   // Detect and draw the coasline
   function drawCoastline() {
     console.time('drawCoastline')
-    Math.seedrandom(seed) // reset seed to get the same result on heightmap edit
+    seedrandom(seed) // reset seed to get the same result on heightmap edit
     const shape = defs.append('mask').attr('id', 'shape').attr('fill', 'black').attr('x', 0)
                       .attr('y', 0).attr('width', '100%').attr('height', '100%')
     $('#landmass').empty()
@@ -7863,9 +7872,9 @@ function fantasyMap() {
   function toggleHeight() {
     const scheme = styleSchemeInput.value
     let hColor = color
-    if (scheme === 'light') hColor = d3.scaleSequential(d3.interpolateRdYlGn)
-    if (scheme === 'green') hColor = d3.scaleSequential(d3.interpolateGreens)
-    if (scheme === 'monochrome') hColor = d3.scaleSequential(d3.interpolateGreys)
+    if (scheme === 'light') hColor = d3.scaleSequential(d3chromatic.interpolateRdYlGn)
+    if (scheme === 'green') hColor = d3.scaleSequential(d3chromatic.interpolateGreens)
+    if (scheme === 'monochrome') hColor = d3.scaleSequential(d3chromatic.interpolateGreys)
     if (!terrs.selectAll('path').size()) {
       cells.map(function(i, d) {
         let height = i.height
@@ -8009,7 +8018,7 @@ function fantasyMap() {
 
   // Draw the water flux system (for dubugging)
   function toggleFlux() {
-    const colorFlux = d3.scaleSequential(d3.interpolateBlues)
+    const colorFlux = d3.scaleSequential(d3chromatic.interpolateBlues)
     if (terrs.selectAll('path').size() == 0) {
       land.map(function(i) {
         terrs.append('path')
@@ -10514,7 +10523,7 @@ function fantasyMap() {
       const r = data[p], g = data[p + 1], b = data[p + 2]
       colors.push([r, g, b])
     })
-    const cmap = MMCQ.quantize(colors, count)
+    const cmap = quantize(colors, count)
     heights = new Uint8Array(points.length)
     polygons.map(function(i, d) {
       const nearest = cmap.nearest(colors[d])
