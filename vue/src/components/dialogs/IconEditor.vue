@@ -21,10 +21,10 @@
   <div id="iconSizeSection" style="display: none">
     <i onmouseover="tip('Change size for group icon')" class="icon-s"></i>
     <input id="iconSize" onmouseover="tip('Change size for group icon')" type="range"
-           class="editRange" value="1" min=".5" max="10" step=".05"></select>
+           class="editRange" value="1" min=".5" max="10" step=".05">
     <i onmouseover="tip('Change group stroke-width')" class="icon-w"></i>
     <input id="iconStrokeWidth" onmouseover="tip('Change group stroke-width')" type="number"
-           class="editNumber" value="1" min="0" max="5" step=".02"></select>
+           class="editNumber" value="1" min="0" max="5" step=".02">
   </div>
   <button id="iconCopy" onmouseover="tip('Copy the icon')" class="icon-clone"></button>
   <button id="iconRemove" onmouseover="tip('Remove icon')" class="icon-trash"></button>

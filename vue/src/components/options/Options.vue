@@ -1,6 +1,6 @@
 <template>
- <div id="optionsContainer" class="hidden">
-   <div id="collapsible">
+<div id="optionsContainer">
+  <div id="collapsible">
       <button id="optionsTrigger" onmouseover="tip('Click to toggle options. Hotkey: O')"
               class="options icon-right-open glow"/>
       <button id="regenerate" onmouseover="tip('Click to generate a new map. Hotkey: F6')"
@@ -40,6 +40,8 @@
 </template>
 
 <script>
+import * as $ from 'jquery'
+
 import LayoutContent from './LayoutContent.vue'
 import StyleContent from './StyleContent.vue'
 import OptionsContent from './OptionsContent.vue'
@@ -56,7 +58,14 @@ export default {
     CustomizeContent,
     AboutContent,
     Stickied,
-  }
+  },
+  mounted() {
+    $('#optionsContainer').draggable({handle: '.drag-trigger', snap: 'svg', snapMode: 'both'})
+    $('#optionsContainer *').on('mouseout', function() {
+      let tooltip = document.getElementById('tooltip')
+      tooltip.innerHTML = tooltip.getAttribute('data-main')
+    })
+  },
 }
 </script>
 

@@ -60,28 +60,6 @@ export default {
   },
 }
 
-// Fantasy Map Generator main script
-// Azgaar (maxganiev@yandex.com). Minsk, 2017-2018
-// https://github.com/Azgaar/Fantasy-Map-Generator
-// GNU General Public License v3.0
-
-// To programmers:
-// I don't mind of any help with programming
-// I know the code is badly structurized and it's hard to read it as a single page
-// Meanwhile a core part takes only 300-500 lines
-
-// What should be done generally:
-// Refactor the code
-// Modernize the code (ES6)
-// Optimize the code
-// Modulize the code
-
-// And particularry:
-// Migrate from d3-voronoi to mapbox-delunator or d3-delaunay
-// Use typed arrays instead of array of objects
-// Get rid of jQuery as d3.js can almost all the same and more
-// Re-build UI on reactive approach, vue.js
-
 'use strict'
 
 //fantasyMap();
@@ -203,14 +181,12 @@ function fantasyMap() {
   // toggle off loading screen and on menus
   $('#loading, #initial').remove()
   svg.style('background-color', '#000000')
-  $('#optionsContainer, #tooltip').show()
   if (localStorage.getItem('disable_click_arrow_tooltip')) {
     tooltip.innerHTML = ''
     tooltip.setAttribute('data-main', '')
     $('#optionsTrigger').removeClass('glow')
   }
 
-  $('#optionsContainer').draggable({handle: '.drag-trigger', snap: 'svg', snapMode: 'both'})
   $('#mapLayers').sortable({items: 'li:not(.solid)', cancel: '.solid', update: moveLayer})
   $('#templateBody').sortable({items: 'div:not(div[data-type=\'Mountain\'])'})
   $('#mapLayers, #templateBody').disableSelection()
@@ -10961,10 +10937,6 @@ function tip(tip, main, error) {
 }
 
 window.tip = tip
-
-$('#optionsContainer *').on('mouseout', function() {
-  tooltip.innerHTML = tooltip.getAttribute('data-main')
-})
 
 </script>
 

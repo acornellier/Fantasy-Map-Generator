@@ -76,7 +76,7 @@
       <i onmouseover="tip('Change icon size')" class="icon-resize-full"></i>
       <input id="burgIconSize" onmouseover="tip('Change icon size')" type="range"
              class="editRange" value="1" min=".1" max="5" step=".05"
-             style="width: 60px;"></select>
+             style="width: 60px;">
       <i onmouseover="tip('Set icon fill opacity')" class="icon-adjust"></i>
       <input id="burgIconFillOpacity" onmouseover="tip('Set icon fill opacity')" value="1"
              type="number" min="0" max="1" step="0.02" style="width: 40px;">
@@ -89,7 +89,7 @@
     <div id="burgIconStrokeSection" style="display: none;">
       <i onmouseover="tip('Change icon stroke width')" class="icon-resize-horizontal"></i>
       <input id="burgIconStrokeWidth" onmouseover="tip('Change icon stroke width')"
-             type="number" value="1" min="0" max="2" step=".02" style="width: 40px;"></select>
+             type="number" value="1" min="0" max="2" step=".02" style="width: 40px;">
       <i onmouseover="tip('Set icon stroke opacity')" class="icon-adjust"></i>
       <input id="burgIconStrokeOpacity" onmouseover="tip('Set icon stroke opacity')" value="1"
              type="number" min="0" max="1" step="0.02" style="width: 40px;">
@@ -109,7 +109,7 @@
             class="icon-anchor"></button>
     <i onmouseover="tip('Set Burg population')" class="icon-users"></i>
     <input id="burgPopulation" onmouseover="tip('Set Burg population (in population points)')"
-           type="number" value="1" min="0" step="1" style="width: 40px;"></select>
+           type="number" value="1" min="0" step="1" style="width: 40px;">
     <output id="burgPopulationFriendly" onmouseover="tip('Burg population (in people)')">
       1000
     </output>

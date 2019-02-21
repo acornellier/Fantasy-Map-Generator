@@ -29,7 +29,7 @@
     <select id="labelFontSelect"
             onmouseover="tip('Select one of the default Fonts')"></select>
     <input id="labelFontInput" placeholder="link to @font-face"
-           onmouseover="tip('Fetch fonts by linking @font-face declaration')"/ class="hidden">
+           onmouseover="tip('Fetch fonts by linking @font-face declaration')" class="hidden">
     <i id="labelSizeIcon" class="icon-text-height"></i>
     <input id="labelSize" onmouseover="tip('Change Font size for the label Group')" value="14"
            type="number" min="1" max="100" step=".5" class="editNumber"/>
