@@ -1,7 +1,7 @@
 <template>
 <div id="styleContent" class="tabcontent">
   <p style="display: inline-block;">Select element:</p>
-  <select id="styleElementSelect">
+  <select id="styleElementSelect" @change="selectStyle($event)">
     <option value="grid">Grid</option>
     <option value="neutralBorders">Borders (neutral)</option>
     <option value="stateBorders">Borders (state)</option>
@@ -158,8 +158,75 @@
 </template>
 
 <script>
+import * as $ from 'jquery'
+import * as d3 from 'd3'
+
 export default {
-  name: 'StyleContent'
+  name: 'StyleContent',
+  methods: {
+    selectStyle(event) {
+      const svg = d3.select('svg')
+      const viewbox = svg.select("#viewbox");
+      const ocean = viewbox.select("#ocean");
+      const oceanLayers = ocean.select("#oceanLayers");
+
+      const sel = event.target.value;
+      let el = viewbox.select("#"+sel);
+      if (sel == "ocean") el = oceanLayers.select("rect");
+      $("#styleInputs > div").hide();
+
+      // opacity
+      $("#styleOpacity, #styleFilter").css("display", "block");
+      const opacity = el.attr("opacity") || 1;
+      $('#styleOpacityInput').value = $('#styleOpacityOutput').value = opacity;
+
+      // filter
+      if (sel == "ocean") el = oceanLayers;
+      $('#styleFilterInput').value = el.attr("filter") || "";
+      if (sel === "rivers" || sel === "lakes" || sel === "landmass") {
+        $("#styleFill").css("display", "inline-block");
+        $('#styleFillInput').value = $('#styleFillOutput').value = el.attr("fill");
+      }
+
+      if (sel === "roads" || sel === "trails" || sel === "searoutes" || sel === "lakes" || sel === "stateBorders" || sel === "neutralBorders" || sel === "grid" || sel === "overlay" || sel === "coastline") {
+        $("#styleStroke").css("display", "inline-block");
+        $('#styleStrokeInput').value = $('#styleStrokeOutput').value = el.attr("stroke");
+        $("#styleStrokeWidth").css("display", "block");
+        const width = el.attr("stroke-width") || "";
+        $('#styleStrokeWidthInput').value = $('#styleStrokeWidthOutput').value = width;
+      }
+
+      if (sel === "roads" || sel === "trails" || sel === "searoutes" || sel === "stateBorders" || sel === "neutralBorders" || sel === "overlay") {
+        $("#styleStrokeDasharray, #styleStrokeLinecap").css("display", "block");
+        $('#styleStrokeDasharrayInput').value = el.attr("stroke-dasharray") || "";
+        $('#styleStrokeLinecapInput').value = el.attr("stroke-linecap") || "inherit";
+      }
+
+      if (sel === "terrs") $("#styleScheme").css("display", "block");
+      if (sel === "heightmap") $("#styleScheme").css("display", "block");
+      if (sel === "overlay") $("#styleOverlay").css("display", "block");
+
+      if (sel === "labels") {
+        $("#styleFill, #styleStroke, #styleStrokeWidth, #styleFontSize").css("display", "inline-block");
+        $('#styleFillInput').value = $('#styleFillOutput').value = el.select("g").attr("fill") || "#3e3e4b";
+        $('#styleStrokeInput').value = $('#styleStrokeOutput').value = el.select("g").attr("stroke") || "#3a3a3a";
+        $('#styleStrokeWidthInput').value = $('#styleStrokeWidthOutput').value = el.attr("stroke-width") || 0;
+        $("#styleLabelGroups").css("display", "inline-block");
+        this.$emit('updateLabelGroups');
+      }
+
+      if (sel === "ocean") {
+        $("#styleOcean").css("display", "block");
+        $('#styleOceanBack').value = $('#styleOceanBackOutput').value = svg.style("background-color");
+        $('#styleOceanFore').value = $('#styleOceanForeOutput').value = oceanLayers.select("rect").attr("fill");
+      }
+
+      if (sel === "coastline") {
+        $("#styleCoastline").css("display", "block");
+        if ($("#styleCoastline").checked) $("#styleFilter").hide();
+      }
+    }
+  },
 }
 </script>
 

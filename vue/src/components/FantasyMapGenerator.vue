@@ -9,7 +9,7 @@
     <p id="loading-text">LOADING<span>.</span><span>.</span><span>.</span></p>
   </div>
   <canvas id="canvas" style="opacity: 0"/>
-  <Options/>
+  <Options @updateLabelGroups="updateLabelGroups"/>
   <Dialogs/>
   <div id="map-dragged" style="display: none">
     <p>Drop to upload</p>
@@ -46,6 +46,9 @@ import Dialogs from './dialogs/Dialogs.vue'
 import Graphic from './Graphic.vue'
 import Options from './options/Options.vue'
 
+window.$ = $
+window.d3 = d3
+
 /* eslint-disable */
 
 export default {
@@ -58,13 +61,40 @@ export default {
     Graphic,
     Options,
   },
+  methods: {
+    updateLabelGroups() {
+      updateLabelGroups()
+    }
+  },
 }
 
 'use strict'
 
-//fantasyMap();
+let labels
+// update Label Groups displayed on Style tab
+function updateLabelGroups() {
+  if ($('#styleElementSelect').value !== 'labels') return
+  const cont = d3.select('#styleLabelGroupItems')
+  cont.selectAll('button').remove()
+  labels.selectAll('g').each(function() {
+    const el = d3.select(this)
+    const id = el.attr('id')
+    const name = id.charAt(0).toUpperCase() + id.substr(1)
+    const state = el.classed('hidden')
+    if (id === 'burgLabels') return
+    cont.append('button').attr('id', id).text(name).classed('buttonoff', state)
+        .on('click', function() {
+          // toggle label group on click
+          if ($('#hideLabels').checked) $('#hideLabels').click()
+          const el = d3.select('#' + this.id)
+          const state = !el.classed('hidden')
+          el.classed('hidden', state)
+          d3.select(this).classed('buttonoff', state)
+        })
+  })
+}
+
 function fantasyMap() {
-  // Version control
   const version = '0.60b'
   document.title += ' v. ' + version
 
@@ -92,7 +122,7 @@ function fantasyMap() {
   let trails = routes.append('g').attr('id', 'trails').attr('data-type', 'land')
   let searoutes = routes.append('g').attr('id', 'searoutes').attr('data-type', 'sea')
   let coastline = viewbox.append('g').attr('id', 'coastline')
-  let labels = viewbox.append('g').attr('id', 'labels')
+  labels = viewbox.append('g').attr('id', 'labels')
   let burgLabels = labels.append('g').attr('id', 'burgLabels')
   let icons = viewbox.append('g').attr('id', 'icons')
   let burgIcons = icons.append('g').attr('id', 'burgIcons')
@@ -247,7 +277,7 @@ function fantasyMap() {
       let relative = rn((desired + desired / scale) / 2, 2)
       if (relative < 2) relative = 2
       el.attr('font-size', relative)
-      if (hideLabels.checked) {
+      if ($('#hideLabels').checked) {
         el.classed('hidden', relative * scale < 6)
         updateLabelGroups()
       }
@@ -7553,43 +7583,6 @@ function fantasyMap() {
     else if (ctrl && key === 89) redo.click() // Ctrl + "Y" to toggle undo
   })
 
-  // Show help
-  function showHelp() {
-    $('#help').dialog({
-      title: 'About Fantasy Map Generator',
-      minHeight: 30, width: 'auto', maxWidth: 275, resizable: false,
-      position: {my: 'center top+10', at: 'bottom', of: this},
-      close: unselect
-    })
-  }
-
-  // Toggle Options pane
-  $('#optionsTrigger').on('click', function() {
-    if (tooltip.getAttribute('data-main') === 'Сlick the arrow button to open options') {
-      tooltip.setAttribute('data-main', '')
-      tooltip.innerHTML = ''
-      localStorage.setItem('disable_click_arrow_tooltip', true)
-    }
-    if ($('#options').css('display') === 'none') {
-      $('#regenerate').hide()
-      $('#options').fadeIn()
-      $('#layoutTab').click()
-      $('#optionsTrigger').removeClass('icon-right-open glow').addClass('icon-left-open')
-    } else {
-      $('#options').fadeOut()
-      $('#optionsTrigger').removeClass('icon-left-open').addClass('icon-right-open')
-    }
-  })
-  $('#collapsible').hover(function() {
-    if ($('#optionsTrigger').hasClass('glow')) return
-    if ($('#options').css('display') === 'none') {
-      $('#regenerate').show()
-      $('#optionsTrigger').removeClass('glow')
-    }
-  }, function() {
-    $('#regenerate').hide()
-  })
-
   // move layers on mapLayers dragging (jquery sortable)
   function moveLayer(event, ui) {
     const el = getLayer(ui.item.attr('id'))
@@ -8201,16 +8194,6 @@ function fantasyMap() {
     $('#saveDropdown').slideUp('fast')
   })
 
-  // lock / unlock option randomization
-  $('#options i[class^=\'icon-lock\']').click(function() {
-    $(this).toggleClass('icon-lock icon-lock-open')
-    const locked = +$(this).hasClass('icon-lock')
-    $(this).attr('data-locked', locked)
-    const option = (this.id).slice(4, -5).toLowerCase()
-    const value = $('#' + option + 'Input').val()
-    if (locked) {localStorage.setItem(option, value)} else {localStorage.removeItem(option)}
-  })
-
   function editHeightmap(type) {
     closeDialogs()
     const regionData = [], cultureData = []
@@ -8364,7 +8347,11 @@ function fantasyMap() {
       var dist = '<label>distribution:<input class="templateElDist" onmouseover="tip(\'Set blobs distribution. 0.5 - map center; 0 - any place\')" type="number" value="0.25" min="0" max="0.5" step="0.01"></label>'
     }
     if (id === 'Add' || id === 'Multiply') {
-      var dist = '<label>to:<select class="templateElDist" onmouseover="tip(\'Change only land or all cells\')"><option value="all" selected>all cells</option><option value="land">land only</option><option value="interval">interval</option></select></label>'
+      var dist = '<label>to:' +
+                 '<select class="templateElDist" onmouseover="tip(\'Change only land or all cells\')">' +
+                 '<option value="all" selected>all cells</option>' +
+                 '<option value="land">land only</option>' +
+                 '<option value="interval">interval</option></select></label>'
     }
     if (id === 'Add') {
       var count = '<label>value:<input class="templateElCount" onmouseover="tip(\'Add value to height of all cells (negative values are allowed)\')" type="number" value="-10" min="-100" max="100" step="1"></label>'
@@ -10485,65 +10472,9 @@ function fantasyMap() {
          .attr('stroke-width', 1.2).attr('size', 1)
   }
 
-  // Style options
-  $('#styleElementSelect').on('change', function() {
-    const sel = this.value
-    let el = viewbox.select('#' + sel)
-    if (sel == 'ocean') el = oceanLayers.select('rect')
-    $('#styleInputs > div').hide()
-
-    // opacity
-    $('#styleOpacity, #styleFilter').css('display', 'block')
-    const opacity = el.attr('opacity') || 1
-    styleOpacityInput.value = styleOpacityOutput.value = opacity
-
-    // filter
-    if (sel == 'ocean') el = oceanLayers
-    styleFilterInput.value = el.attr('filter') || ''
-    if (sel === 'rivers' || sel === 'lakes' || sel === 'landmass') {
-      $('#styleFill').css('display', 'inline-block')
-      styleFillInput.value = styleFillOutput.value = el.attr('fill')
-    }
-
-    if (sel === 'roads' || sel === 'trails' || sel === 'searoutes' || sel === 'lakes' || sel === 'stateBorders' || sel === 'neutralBorders' || sel === 'grid' || sel === 'overlay' || sel === 'coastline') {
-      $('#styleStroke').css('display', 'inline-block')
-      styleStrokeInput.value = styleStrokeOutput.value = el.attr('stroke')
-      $('#styleStrokeWidth').css('display', 'block')
-      const width = el.attr('stroke-width') || ''
-      styleStrokeWidthInput.value = styleStrokeWidthOutput.value = width
-    }
-
-    if (sel === 'roads' || sel === 'trails' || sel === 'searoutes' || sel === 'stateBorders' || sel === 'neutralBorders' || sel === 'overlay') {
-      $('#styleStrokeDasharray, #styleStrokeLinecap').css('display', 'block')
-      styleStrokeDasharrayInput.value = el.attr('stroke-dasharray') || ''
-      styleStrokeLinecapInput.value = el.attr('stroke-linecap') || 'inherit'
-    }
-
-    if (sel === 'terrs') $('#styleScheme').css('display', 'block')
-    if (sel === 'heightmap') $('#styleScheme').css('display', 'block')
-    if (sel === 'overlay') $('#styleOverlay').css('display', 'block')
-
-    if (sel === 'labels') {
-      $('#styleFill, #styleStroke, #styleStrokeWidth, #styleFontSize')
-        .css('display', 'inline-block')
-      styleFillInput.value = styleFillOutput.value = el.select('g').attr('fill') || '#3e3e4b'
-      styleStrokeInput.value =
-        styleStrokeOutput.value = el.select('g').attr('stroke') || '#3a3a3a'
-      styleStrokeWidthInput.value = styleStrokeWidthOutput.value = el.attr('stroke-width') || 0
-      $('#styleLabelGroups').css('display', 'inline-block')
-      updateLabelGroups()
-    }
-
-    if (sel === 'ocean') {
-      $('#styleOcean').css('display', 'block')
-      styleOceanBack.value = styleOceanBackOutput.value = svg.style('background-color')
-      styleOceanFore.value = styleOceanForeOutput.value = oceanLayers.select('rect').attr('fill')
-    }
-  })
-
   // update Label Groups displayed on Style tab
   function updateLabelGroups() {
-    if (styleElementSelect.value !== 'labels') return
+    if ($('#styleElementSelect').value !== 'labels') return
     const cont = d3.select('#styleLabelGroupItems')
     cont.selectAll('button').remove()
     labels.selectAll('g').each(function() {
@@ -10555,7 +10486,7 @@ function fantasyMap() {
       cont.append('button').attr('id', id).text(name).classed('buttonoff', state)
           .on('click', function() {
             // toggle label group on click
-            if (hideLabels.checked) hideLabels.click()
+            if ($('#hideLabels').checked) $('#hideLabels').click()
             const el = d3.select('#' + this.id)
             const state = !el.classed('hidden')
             el.classed('hidden', state)
