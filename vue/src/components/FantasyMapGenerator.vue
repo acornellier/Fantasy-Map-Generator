@@ -1,6 +1,6 @@
 <template>
 <!-- eslint-disable -->
-<div class="hello">
+<div class="app">
   <svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink"
        width="100%" height="100%">
     <defs>
@@ -175,663 +175,8 @@
     <div id="version">v. 0.60b</div>
     <p id="loading-text">LOADING<span>.</span><span>.</span><span>.</span></p>
   </div>
-  <canvas id="canvas" style="opacity: 0"></canvas>
-  <div id="optionsContainer" class="hidden">
-    <div id="collapsible">
-      <button id="optionsTrigger" onmouseover="tip('Click to toggle options. Hotkey: O')"
-              class="options icon-right-open glow"></button>
-      <button id="regenerate" onmouseover="tip('Click to generate a new map. Hotkey: F6')"
-              class="options">New Map!
-      </button>
-    </div>
-    <div id="options">
-      <div class="drag-trigger" onmouseover="tip('Drag to move options pane')"></div>
-      <div class="tab">
-        <button id="layoutTab" onmouseover="tip('Click to open layout menu')" class="options">
-          Layout
-        </button>
-        <button id="styleTab" onmouseover="tip('Click to style menu')" class="options">Style
-        </button>
-        <button id="optionsTab" onmouseover="tip('Click to change generation options')"
-                class="options">Options
-        </button>
-        <button id="customizeTab" onmouseover="tip('Click to open customization menu')"
-                class="options">Customize
-        </button>
-        <button id="aboutTab" onmouseover="tip('Click to see Generator info')" class="options">?
-        </button>
-      </div>
-      <div id="layoutContent" class="tabcontent">
-        <p style="display: inline-block;">Select preset:</p>
-        <select id="layoutPreset">
-          <option value="layoutPolitical" selected>Political map</option>
-          <option value="layoutCultural">Cultural map</option>
-          <!-- <option value="layoutEconomical">Economical map</option> -->
-          <option value="layoutHeightmap">Heightmap</option>
-          <option value="layoutLandmass">Pure landmass</option>
-        </select>
-        <p>Displayed layers. Drag to move, click to toggle</p>
-        <ul id="mapLayers">
-          <li onmouseover="tip('Toggle Ocean pattern (see Style tab for styling)')"
-              id="toggleOcean" onclick="$('#oceanPattern').fadeToggle()" class="solid">Ocean
-          </li>
-          <li onmouseover="tip('Toggle Heightmap (see Style tab for styling and Customize for editting)')"
-              id="toggleHeight" class="buttonoff">Heightmap
-          </li>
-          <li onmouseover="tip('Toggle Grid')" id="toggleGrid" class="buttonoff"
-              onclick="$('#grid').fadeToggle()">Grid
-          </li>
-          <li onmouseover="tip('Toggle Overlay (overlay type can be set in Style tab)')"
-              id="toggleOverlay" class="buttonoff">Overlay
-          </li>
-          <li onmouseover="tip('Toggle Cultural map (does not work good when counties layer is on)')"
-              id="toggleCultures" class="buttonoff">Cultures
-          </li>
-          <li onmouseover="tip('Toggle Routes')" id="toggleRoutes"
-              onclick="$('#routes').fadeToggle()">Routes
-          </li>
-          <li onmouseover="tip('Toggle Rivers')" id="toggleRivers"
-              onclick="$('#rivers').fadeToggle()">Rivers
-          </li>
-          <li onmouseover="tip('Toggle Countries (open Customize tab for editting)')"
-              id="toggleCountries">Countries
-          </li>
-          <li onmouseover="tip('Toggle Borders')" id="toggleBorders"
-              onclick="$('#borders').fadeToggle()">Borders
-          </li>
-          <li onmouseover="tip('Toggle Relief icons (draft version)')" id="toggleRelief"
-              onclick="$('#terrain').fadeToggle()">Relief
-          </li>
-          <li onmouseover="tip('Toggle Labels (label groups can be toggled separately in Style tab)')"
-              id="toggleLabels" onclick="$('#labels').fadeToggle()">Labels
-          </li>
-          <li onmouseover="tip('Toggle Burg icons')" id="toggleIcons"
-              onclick="$('#icons').fadeToggle()">Icons
-          </li>
-          <li onmouseover="tip('Toggle Markers')" id="toggleMarkers"
-              onclick="$('#markers').fadeToggle()">Markers
-          </li>
-        </ul>
-        <div id="layoutCheckboxes">
-          <input id="toggleTooltips" class="checkbox" type="checkbox" checked
-                 onclick="$('#tooltip').fadeToggle()">
-          <label for="toggleTooltips" onmouseover="tip('Toogle tooltip line and legend box')"
-                 class="checkbox-label">Show tooltips</label>
-          <label id="optionSeedLabel"
-                 onmouseover="tip('Map seed. Please do NOT consider as a save function, seed produces different maps in case of code and options change')"
-                 style="margin-left:10px">Map seed:
-            <input id="optionsSeed"
-                   onmouseover="tip('Map seed. Please do NOT consider as a save function, seed produces different maps in case of code and options change')"
-                   class="pureInput" style="width:50px" value="">
-            <i onmouseover="tip('Click to generate a map for this seed')" id="optionsSeedGenerate"
-               style="margin-left:-3px; color: #5d4651" class="icon-play"></i>
-          </label>
-        </div>
-      </div>
-      <div id="styleContent" class="tabcontent">
-        <p style="display: inline-block;">Select element:</p>
-        <select id="styleElementSelect">
-          <option value="grid">Grid</option>
-          <option value="neutralBorders">Borders (neutral)</option>
-          <option value="stateBorders">Borders (state)</option>
-          <option value="coastline">Coastline</option>
-          <option value="regions">Countries</option>
-          <option value="cults">Cultures</option>
-          <option value="terrs">Heightmap</option>
-          <option value="icons">Icons</option>
-          <option value="labels">Labels</option>
-          <option value="lakes">Lakes</option>
-          <option value="landmass">Landmass</option>
-          <option value="markers">Markers</option>
-          <option value="ocean" selected>Ocean</option>
-          <option value="overlay">Overlay</option>
-          <option value="terrain">Relief</option>
-          <option value="rivers">Rivers</option>
-          <option value="roads">Roads</option>
-          <option value="ruler">Rulers</option>
-          <option value="trails">Trails</option>
-          <option value="searoutes">Searoutes</option>
-          <option value="scaleBar">Scale bar</option>
-        </select>
-        <i id="restoreStyle" onmouseover="tip('Restore default style')" class="icon-ccw"></i>
-        <div id="styleInputs">
-          <div id="styleOverlay">
-            <br><span>Ensure Overlay layer is active (see Layout tab)</span><br>
-            <br>Overlay type: <select id="styleOverlayType" class="pureInput">
-            <option value="pointyHex" selected>Hex grid (pointy)</option>
-            <option value="flatHex">Hex grid (flat)</option>
-            <option value="square">Square grid</option>
-            <option value="windrose">Wind rose</option>
-          </select><br>
-            <br>Size: <input id="styleOverlaySize" type="range" min="2" max="50" step="0.1"
-                             value="10">
-            <output id="styleOverlaySizeOutput" onmouseover="tip('Overlay size')">10</output>
-            <output id="styleOverlaySizeFriendly"
-                    onmouseover="tip('Size between two adjacent cells in map scale')">(52 mi)
-            </output>
-          </div>
-          <div id="styleOcean">
-            <br>Elements:
-            <input id="styleOceanPattern" class="checkbox" type="checkbox" checked>
-            <label for="styleOceanPattern" onmouseover="tip('Toggle ocean pattern')"
-                   class="checkbox-label">Pattern</label>
-            <input id="styleOceanLayers" class="checkbox" type="checkbox" checked>
-            <label for="styleOceanLayers" onmouseover="tip('Toggle ocean layers')"
-                   class="checkbox-label">Layers</label><br>
-            Background: <input id="styleOceanBack" type="color" value="#000000"/>
-            <output id="styleOceanBackOutput">#000000</output>
-            <br>
-            Foreground: <input id="styleOceanFore" type="color" value="#53679f"/>
-            <output id="styleOceanForeOutput">#53679f</output>
-          </div>
-          <div id="styleFill">
-            Fill: <input id="styleFillInput" type="color" value="#5E4FA2"/>
-            <output id="styleFillOutput">#5E4FA2</output>
-          </div>
-          <div id="styleStroke">
-            Stroke: <input id="styleStrokeInput" type="color" value="#5E4FA2"/>
-            <output id="styleStrokeOutput">#5E4FA2</output>
-          </div>
-          <div id="styleStrokeWidth">
-            <br>Stroke width: <input id="styleStrokeWidthInput" type="range" min="0" max="3"
-                                     step="0.01" value="1">
-            <output id="styleStrokeWidthOutput">1</output>
-          </div>
-          <div id="styleStrokeDasharray">
-            <br>Stroke dasharray: <input id="styleStrokeDasharrayInput" class="pureInput"
-                                         value="1 2">
-          </div>
-          <div id="styleStrokeLinecap">
-            <br>Stroke linecap: <select id="styleStrokeLinecapInput" class="pureInput">
-            <option value="inherit" selected>Inherit</option>
-            <option value="butt">Butt</option>
-            <option value="round">Round</option>
-            <option value="square">Square</option>
-          </select>
-          </div>
-          <div id="styleFontSize">
-            <br>Font size:
-            <button class="whiteButton" onmouseover="tip('Multiply all Fonts size by 1.1')"
-                    id="styleFontPlus">+
-            </button>
-            <button class="whiteButton" onmouseover="tip('Multiply all Fonts size by 0.9')"
-                    id="styleFontMinus">-
-            </button>
-          </div>
-          <div id="styleSize">
-            <br>Radius:
-            <button class="whiteButton" onmouseover="tip('Multiply Radius by 1.1')"
-                    id="styleFillPlus">+
-            </button>
-            <button class="whiteButton" onmouseover="tip('Multiply Radius by 0.9')"
-                    id="styleFillMinus">-
-            </button>
-            <span> Stroke: </span>
-            <button class="whiteButton" onmouseover="tip('Multiply Stroke-width by 1.1')"
-                    id="styleStrokePlus">+
-            </button>
-            <button class="whiteButton" onmouseover="tip('Multiply Stroke-width by 0.9')"
-                    id="styleStrokeMinus">-
-            </button>
-          </div>
-
-          <div id="styleOpacity">
-            <br>Opacity: <input id="styleOpacityInput" type="range" min="0" max="1" step="0.01"
-                                value="1">
-            <output id="styleOpacityOutput">1</output>
-          </div>
-          <div id="styleFilter">
-            <br>Filter: <select id="styleFilterInput" class="pureInput">
-            <option value="" selected>None</option>
-            <option value="url(#blurFilter)">Blur 0.2</option>
-            <option value="url(#blur1)">Blur 1</option>
-            <option value="url(#blur5)">Blur 5</option>
-            <option value="url(#blur10)">Blur 10</option>
-            <option value="url(#splotch)">Splotch</option>
-            <option value="url(#bluredSplotch)">Blured Splotch</option>
-            <option value="url(#dropShadow01)">Shadow 0.1</option>
-            <option value="url(#dropShadow05)">Shadow 0.5</option>
-            <option value="url(#dropShadow)">Shadow 2</option>
-            <option value="url(#outline)">Outline</option>
-            <option value="url(#pencil)">Pencil</option>
-            <option value="url(#turbulence)">Turbulence</option>
-          </select>
-          </div>
-          <div id="styleScheme">
-            <br>Color scheme: <select id="styleSchemeInput" class="pureInput">
-            <option value="bright" selected>Bright</option>
-            <option value="light">Light</option>
-            <option value="green">Green</option>
-            <option value="monochrome">Monochrome</option>
-          </select>
-          </div>
-          <div id="styleLabelGroups">
-            <fieldset>
-              <legend>Label groups:</legend>
-              <input id="hideLabels" class="checkbox" type="checkbox" checked>
-              <label for="hideLabels"
-                     onmouseover="tip('Allow system to hide labels if their size in too small on that scale)')"
-                     class="checkbox-label">Toggle visibility automatically</label>
-              <div id="styleLabelGroupItems"></div>
-            </fieldset>
-          </div>
-        </div>
-        <div id="mapFilters">
-          <p>Toggle filters:</p>
-          <button id="grayscale" class="radio">Grayscale</button>
-          <button id="sepia" class="radio">Sepia</button>
-          <button id="dingy" class="radio">Dingy</button>
-          <button id="tint" class="radio">Tint</button>
-        </div>
-      </div>
-      <div id="optionsContent" class="tabcontent">
-        <p onmouseover="tip('Map generation setting. Generate a new map to apply the settings')">
-          Generation options (new map to apply):</p>
-        <table>
-          <tr>
-            <td></td>
-            <td onmouseover="tip('Map canvas height and width in pixels. Highly affects performance')">
-              Map size
-            </td>
-            <td style="width: 130px;">
-              <span onmouseover="tip('Map width')">w:</span>
-              <input class="pairedNumber" id="mapWidthInput" type="number" min="240" value="960">
-              <span onmouseover="tip('Map height')">h:</span>
-              <input class="pairedNumber" id="mapHeightInput" type="number" min="135" value="540">
-            </td>
-            <td>
-              <i onmouseover="tip('Fit map to screen size')" id="updateFullscreen"
-                 class="icon-resize-full-alt"></i>
-            </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td onmouseover="tip('Cells density controls underlying graph size and hightly affects performance')">
-              Map cells density
-            </td>
-            <td>
-              <input id="sizeInput" type="range" min="1" max="3" value="1">
-            </td>
-            <td>
-              <output id="sizeOutput">1</output>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <i onmouseover="tip('Lock to restrict option randomization on new map generation')"
-                 data-locked=0 id="lockTemplateInput" class="icon-lock-open"></i>
-            </td>
-            <td onmouseover="tip('Select template to be used for a Heightmap generation')">
-              Heightmap template
-            </td>
-            <td>
-              <select id="templateInput">
-                <option value="Volcano">Volcano</option>
-                <option value="High Island">High Island</option>
-                <option value="Low Island">Low Island</option>
-                <option value="Continents">Continents</option>
-                <option value="Archipelago">Archipelago</option>
-                <option value="Atoll">Atoll</option>
-                <option value="Mainland">Mainland</option>
-                <option value="Peninsulas">Peninsulas</option>
-              </select>
-            </td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>
-              <i onmouseover="tip('Lock to restrict option randomization on new map generation')"
-                 data-locked=0 id="lockManorsInput" class="icon-lock-open"></i>
-            </td>
-            <td onmouseover="tip('Define how many Settlements should be placed')">Burgs count</td>
-            <td>
-              <input id="manorsInput" type="range" min="0" max="999" value="500">
-            </td>
-            <td>
-              <output id="manorsOutput">500</output>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <i onmouseover="tip('Lock to restrict option randomization on new map generation')"
-                 data-locked=0 id="lockRegionsInput" class="icon-lock-open"></i>
-            </td>
-            <td onmouseover="tip('Define how many Countries should be created')">States count</td>
-            <td>
-              <input id="regionsInput" type="range" min="0" max="100" value="13">
-            </td>
-            <td>
-              <output id="regionsOutput">13</output>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <i onmouseover="tip('Lock to restrict option randomization on new map generation')"
-                 data-locked=0 id="lockPowerInput" class="icon-lock-open"></i>
-            </td>
-            <td onmouseover="tip('Define Countries size variety. Set to 0 to have all countries sized the same')">
-              States disbalance
-            </td>
-            <td>
-              <input id="powerInput" type="range" min="0" max="10" step="0.2" value="5">
-            </td>
-            <td>
-              <output id="powerOutput">5</output>
-              <br>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <i onmouseover="tip('Unlock to allow option randomization on new map generation')"
-                 data-locked=1 id="lockNeutralInput" class="icon-lock"></i>
-            </td>
-            <td onmouseover="tip('Minimal distance to closest burg to consider land neutral')">
-              Neutral distance
-            </td>
-            <td>
-              <input id="neutralInput" type="range" min="1" max="500" step="1" value="200">
-            </td>
-            <td>
-              <output id="neutralOutput">200</output>
-            </td>
-          </tr>
-          <tr style="display:none">
-            <td>
-              <i onmouseover="tip('Unlock to allow option randomization on new map generation')"
-                 data-locked=1 id="lockNamesInput" class="icon-lock"></i>
-            </td>
-            <td onmouseover="tip('Define name generation style for burgs. Only the first one works offline')">
-              Burg names style
-            </td>
-            <td>
-              <select id="namesInput">
-                <option value=0>Pseudo-real (Culture based simulation; internal generation)
-                </option>
-                <option value=1>High Fantasy (English only; external resource)</option>
-              </select>
-            </td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>
-              <i onmouseover="tip('Lock to restrict option randomization on new map generation')"
-                 data-locked=0 id="lockCulturesInput" class="icon-lock-open"></i>
-            </td>
-            <td onmouseover="tip('Define how many Cultures should be generated')">Cultures count
-            </td>
-            <td>
-              <input id="culturesInput" type="range" min="1" max="13" value="7">
-            </td>
-            <td>
-              <output id="culturesOutput">7</output>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <i onmouseover="tip('Lock to restrict option randomization on new map generation')"
-                 data-locked=0 id="lockPrecInput" class="icon-lock-open"></i>
-            </td>
-            <td onmouseover="tip('Set precipitation level. Controls river quantity and power')">
-              Precipitation
-            </td>
-            <td>
-              <input id="precInput" type="range" min="0" max="25" value="10">
-            </td>
-            <td>
-              <output id="precOutput">15</output>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <i onmouseover="tip('Unlock to allow option randomization on new map generation')"
-                 data-locked=1 id="lockSwampinessInput" class="icon-lock"></i>
-            </td>
-            <td onmouseover="tip('Define the land swampiness. Increase to see more marshes on Relief map')">
-              Swampiness
-            </td>
-            <td>
-              <input id="swampinessInput" type="range" min="0" max="100" value="10">
-            </td>
-            <td>
-              <output id="swampinessOutput">10</output>
-            </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td onmouseover="tip('Define the coast outline contours scheme')">Ocean layers</td>
-            <td>
-              <select id="outlineLayersInput">
-                <option value="random">Random</option>
-                <option value="none">No outline</option>
-                <option value="-6,-3,-1" selected>Standard 3</option>
-                <option value="-6,-4,-2">Indented 3</option>
-                <option value="-9,-6,-3,-1">Standard 4</option>
-                <option value="-6,-5,-4,-3,-2,-1">Smooth 6</option>
-                <option value="-9,-8,-7,-6,-5,-4,-3,-2,-1">Smooth 9</option>
-              </select>
-            </td>
-            <td></td>
-          </tr>
-        </table>
-        <p onmouseover="tip('Generator settings. Getting applied immediately on change')">
-          Generator settings:</p>
-        <table>
-          <tr>
-            <td></td>
-            <td onmouseover="tip('Set dialog and tool windows transparency')">Transparency</td>
-            <td>
-              <input id="transparencyInput" type="range" min="0" max="100" value="0"
-                     oninput="transparencyOutput.value = this.value">
-            </td>
-            <td>
-              <output id="transparencyOutput">0</output>
-            </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td onmouseover="tip('Define relative size of a saved png images. Consider saving big images is slow')">
-              PNG resolution
-            </td>
-            <td>
-              <input id="pngResolutionInput" type="range" min="1" max="10" value="5"
-                     oninput="pngResolutionOutput.value = this.value + 'x'">
-            </td>
-            <td>
-              <output id="pngResolutionOutput">5x</output>
-            </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td onmouseover="tip('Set mininum and maximum zoom level')">Zoom extent</td>
-            <td style="width: 130px;">
-              <span onmouseover="tip('Zoom out limit')">o:</span>
-              <input class="pairedNumber" id="zoomExtentMin" type="number" min="0.2" step="0.1"
-                     max="20" value="1">
-              <span onmouseover="tip('Zoom in limit')">i:</span>
-              <input class="pairedNumber" id="zoomExtentMax" type="number" min="1" max="50"
-                     value="20">
-            </td>
-            <td>
-              <i onmouseover="tip('Restore default [1, 20] zoom extent')" id="zoomExtentDefault"
-                 class="icon-ccw"></i>
-            </td>
-          </tr>
-        </table>
-        <button id="optionsReset" onmouseover="tip('Click to restore default options')">Reset
-          Defaults
-        </button>
-      </div>
-      <div id="customizeContent" class="tabcontent" style="display: block;">
-        <div id="openEditor">
-          <p>Customize:</p>
-          <button id="editHeightmap"
-                  onmouseover="tip('Click to open Heightmap customization menu')">Heightmap
-          </button>
-          <button id="editCountries" onmouseover="tip('Click to open Countries Editor')">
-            Countries
-          </button>
-          <button id="editCultures" onmouseover="tip('Click to open Cultures Editor')">Cultures
-          </button>
-          <button id="editScale" onmouseover="tip('Click to open Scale Editor')">Scale</button>
-        </div>
-        <div id="customizeHeightmap" style="display: none;">
-          <p>Heightmap customization:</p>
-          <div>
-            <button onmouseover="tip('Edit the current Heightmap')" id="fromHeightmap">Edit
-            </button>
-            <button onmouseover="tip('Remove all data and start from scratch')" id="fromScratch">
-              Clear all
-            </button>
-            <button class="buttonoff"
-                    onmouseover="tip('Finalize the Heightmap. Not allowed if landmass area is insufficient')"
-                    id="getMap">Complete
-            </button>
-          </div>
-          <div id="customizationMenu" class="hidden">
-            <div id="customizeTools">
-              <label onmouseover="tip('Customization Tools')">Tools:</label><br>
-              <button onmouseover="tip('Display brushes panel')" id="paintBrushes">Paint Brushes
-              </button>
-              <button onmouseover="tip('Open template editor')" id="applyTemplate">Template
-                Editor
-              </button>
-              <button onmouseover="tip('Open Image Converter')" id="convertImage">Image
-                Converter
-              </button>
-              <button onmouseover="tip('Show Heightmap in perspective')" id="perspectiveView">
-                Perspective View
-              </button>
-            </div>
-            <div id="customizeOptions">
-              <input id="renderOcean" class="checkbox" type="checkbox">
-              <label for="renderOcean" onmouseover="tip('Render cells below sea level')"
-                     class="checkbox-label">Render ocean cells</label>
-              <input id="changeHeights" class="checkbox" type="checkbox">
-              <label for="changeHeights"
-                     onmouseover="tip('Allow system to change custom heights if reasonable')"
-                     class="checkbox-label">Change heights</label>
-            </div>
-            <label onmouseover="tip('Number of Land cells and landmass/ocean ratio')">Landmass:
-              <span id="landmassCounter">0</span> (<span id="landmassRatio">0</span>%); Average
-              Elevation: <span id="landmassAverage">0</span>
-            </label>
-            <hr>
-          </div>
-        </div>
-        <div id="addFeature">
-          <p>Click to add:</p>
-          <button id="addBurg" onmouseover="tip('Click on map to place a burg')">Burg</button>
-          <button id="addLabel" onmouseover="tip('Click on map to place label')">Label</button>
-          <button id="addRelief" onmouseover="tip('Click on map to place a relief icon')">Relief
-            Icon
-          </button>
-          <button id="addRiver"
-                  onmouseover="tip('Click on map to place new river or extend an existing one')">
-            River
-          </button>
-          <button id="addRoute" onmouseover="tip('Click on map to place a route')">Route</button>
-          <button id="addMarker" onmouseover="tip('Click on map to place a marker')">Marker
-          </button>
-        </div>
-        <div id="cellInfo">
-          <p>Cell info:</p>
-          <div>
-            Coord: <span id="infoX">0</span>/<span id="infoY">0</span><br>
-            Cell: <span id="infoCell">0</span><br>
-            Area: <span id="infoArea">0</span><br>
-            Height: <span id="infoHeight">0</span><br>
-            Flux: <span id="infoFlux">0</span>
-          </div>
-          <div>
-            Type: <span id="infoFeature">n/a</span><br>
-            Country: <span id="infoCountry">n/a</span><br>
-            Culture: <span id="infoCulture">n/a</span><br>
-            Population: <span id="infoPopulation">0</span><br>
-            Burg: <span id="infoBurg">n/a</span>
-          </div>
-        </div>
-      </div>
-      <div id="aboutContent" class="tabcontent">
-        <p><a href="https://github.com/Azgaar/Fantasy-Map-Generator" target="_blank">Fantasy Map
-          Generator</a> is an <a
-            href="https://github.com/Azgaar/Fantasy-Map-Generator/blob/master/LICENSE"
-            target="_blank">open source</a> tool which procedurally generates fantasy maps. You
-          may use auto-generated maps as they are, edit them or even create a map from scratch.
-          Check out the <a
-              href="https://github.com/Azgaar/Fantasy-Map-Generator/wiki/Quick-Start-Tutorial"
-              target="_blank">quick start tutorial</a> and <a
-              href="https://github.com/Azgaar/Fantasy-Map-Generator/wiki" target="_blank">project
-            wiki</a> for guidance. Join our <a
-              href="https://www.reddit.com/r/FantasyMapGenerator/" target="_blank">Reddit
-            Community</a> if you have questions, need any help, have a suggestion or just want to
-          share a created map.</p>
-        <p>The project is under active development. For older versions see the <a
-            href="https://github.com/Azgaar/Fantasy-Map-Generator/wiki/Changelog" target="_blank">changelog</a>.
-          Some details are covered in my <a href="https://azgaar.wordpress.com/" target="_blank">blog</a>.
-          To track the current progress see the <a
-              href="https://trello.com/b/7x832DG4/fantasy-map-generator"
-              target="_blank">devboard</a>.</p>
-        <p>Please report bugs <a href="https://github.com/Azgaar/Fantasy-Map-Generator/issues"
-                                 target="_blank">here</a>. You may also <a
-            href="mailto:maxganiev@yandex.ru" target="_blank">send me</a> an email.</p>
-        <ul class="share-buttons">
-          <li><a
-              href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fazgaar.github.io%2FFantasy-Map-Generator%2F&quote="
-              onmouseover="tip('Share on Facebook')" target="_blank"><img alt="Share on Facebook"
-                                                                          src="images/Facebook.png"/></a>
-          </li>
-          <li><a
-              href="https://twitter.com/intent/tweet?source=https%3A%2F%2Fazgaar.github.io%2FFantasy-Map-Generator&text=%23FantasyMapGenerator%0A%0Ahttps%3A//azgaar.github.io/Fantasy-Map-Generator"
-              target="_blank" onmouseover="tip('Tweet')"><img alt="Tweet"
-                                                              src="images/Twitter.png"/></a></li>
-          <li><a
-              href="http://www.tumblr.com/share?v=3&u=https%3A%2F%2Fazgaar.github.io%2FFantasy-Map-Generator"
-              target="_blank" onmouseover="tip('Post to Tumblr')"><img alt="Post to Tumblr"
-                                                                       src="images/Tumblr.png"/></a>
-          </li>
-          <li><a
-              href="http://pinterest.com/pin/create/button/?url=https%3A%2F%2Fazgaar.github.io%2FFantasy-Map-Generator"
-              target="_blank" onmouseover="tip('Pin it')"><img alt="Pin it"
-                                                               src="images/Pinterest.png"/></a>
-          </li>
-          <li><a
-              href="http://www.reddit.com/submit?url=https%3A%2F%2Fazgaar.github.io%2FFantasy-Map-Generator"
-              target="_blank" onmouseover="tip('Submit to Reddit')"><img alt="Submit to Reddit"
-                                                                         src="images/Reddit.png"/></a>
-          </li>
-        </ul>
-      </div>
-      <div id="sticked">
-        <button id="randomMap"
-                onmouseover="tip('Generate a new map based on options. May take about 1 minute. Hotkey: F6')"
-                class="options">New Map
-        </button>
-        <button id="saveButton" onmouseover="tip('Select file format to save map')"
-                class="options">Save as
-        </button>
-        <div id="saveDropdown">
-          <div id="saveMap"
-               onmouseover="tip('Save as fully functional map in .map format. Hotkey: M')">.map
-          </div>
-          <div id="saveSVG"
-               onmouseover="tip('Download the map as .svg image (open in browser or in Inkscape. Hotkey: S)')">
-            .svg
-          </div>
-          <div id="savePNG"
-               onmouseover="tip('Download the visible part of the map as 4K .png image. Please ensure popups are not blocked! Hotkey: P')">
-            .png
-          </div>
-        </div>
-        <button id="loadMap"
-                onmouseover="tip('Load fully functional map in a .map format. Hotkey: L')"
-                class="options">Load
-        </button>
-        <button id="zoomReset" onmouseover="tip('Reset map zoom. Hotkey: 0')" class="options">
-          Reset Zoom
-        </button>
-      </div>
-    </div>
-  </div>
+  <canvas id="canvas" style="opacity: 0"/>
+  <Options/>
 
   <div id="dialogs" style="background-color: #ffffff">
 
@@ -1846,8 +1191,8 @@
     <div id="legendBody"></div>
   </div>
 
-  <div id="tooltip" data-main="Сlick the arrow button to open options">Сlick the arrow button to
-    open options
+  <div id="tooltip" data-main="Сlick the arrow button to open options">
+    Сlick the arrow button to open options
   </div>
 
   <div id="fileInputs" class="hidden">
@@ -1871,18 +1216,18 @@ import * as PriorityQueue from 'js-priority-queue'
 import * as $ from 'jquery'
 import 'jquery-ui-bundle'
 import 'jquery-ui-bundle/jquery-ui.css'
+import Options from './options/Options.vue'
 
 /* eslint-disable */
 
 export default {
   name: 'FantasyMapGenerator',
   mounted() {
-    console.log('mounted')
     fantasyMap()
   },
-  props: {
-    msg: String
-  }
+  components: {
+    Options,
+  },
 }
 
 // Fantasy Map Generator main script
@@ -2197,7 +1542,7 @@ function fantasyMap() {
     params = url.searchParams
     seed = params.get('seed') || Math.floor(Math.random() * 1e9)
     console.log(' seed: ' + seed)
-    optionsSeed.value = seed
+    $('#optionsSeed').value = seed
     seedrandom(seed)
   }
 
@@ -2205,7 +1550,7 @@ function fantasyMap() {
   function changeSeed() {
     seed = Math.floor(Math.random() * 1e9)
     console.log(' seed: ' + seed)
-    optionsSeed.value = seed
+    $('#optionsSeed').value = seed
     seedrandom(seed)
   }
 
@@ -9046,7 +8391,7 @@ function fantasyMap() {
     const params = data[0].split('|')
     if (params[3]) {
       seed = params[3]
-      optionsSeed.value = seed
+      $('#optionsSeed').value = seed
     }
 
     // get options
@@ -12730,8 +12075,8 @@ function fantasyMap() {
 
   // re-load page with provided seed
   $('#optionsSeedGenerate').on('click', function() {
-    if (optionsSeed.value == seed) return
-    seed = optionsSeed.value
+    if ($('#optionsSeed').value == seed) return
+    seed = $('#optionsSeed').value
     const url = new URL(window.location.href)
     window.location.href = url.pathname + '?seed=' + seed
   })

@@ -1,18 +1,16 @@
 <template>
-  <div id="app">
-    <FantasyMapGenerator msg=""/>
-  </div>
+<FantasyMapGenerator/>
 </template>
 
 <script>
-  import FantasyMapGenerator from './components/FantasyMapGenerator.vue'
+import FantasyMapGenerator from './components/FantasyMapGenerator.vue'
 
-  export default {
-    name: 'app',
-    components: {
-      FantasyMapGenerator
-    }
+export default {
+  name: 'app',
+  components: {
+    FantasyMapGenerator
   }
+}
 </script>
 
 <style>
