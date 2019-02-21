@@ -56,7 +56,13 @@
     ImageConverter,
     TemplateEditor,
     MarkerEditor,
-    BurgEditor, ReliefEditor, IconEditor, RouteEditor, LabelsEditor, RiverEditor}
+    BurgEditor,
+    ReliefEditor,
+    IconEditor,
+    RouteEditor,
+    LabelsEditor,
+    RiverEditor,
+  }
 }
 </script>
 
