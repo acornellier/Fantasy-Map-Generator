@@ -225,7 +225,22 @@ export default {
         $("#styleCoastline").css("display", "block");
         if ($("#styleCoastline").checked) $("#styleFilter").hide();
       }
-    }
+    },
+    restoreStyles() {
+      $('alertMessage').innerHTML = 'Are you sure you want to restore default style?'
+      $('#alert').dialog({
+        resizable: false, title: 'Restore style',
+        buttons: {
+          Restore: function() {
+            this.$emit('applyDefaultStyle')
+            $(this).dialog('close')
+          },
+          Cancel: function() {
+            $(this).dialog('close')
+          }
+        }
+      })
+    },
   },
 }
 </script>

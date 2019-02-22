@@ -9,7 +9,10 @@
     <p id="loading-text">LOADING<span>.</span><span>.</span><span>.</span></p>
   </div>
   <canvas id="canvas" style="opacity: 0"/>
-  <Options @updateLabelGroups="updateLabelGroups"/>
+  <Options
+    @updateLabelGroups="updateLabelGroups"
+    @applyDefaultStyle="applyDefaultStyle"
+  />
   <Dialogs/>
   <div id="map-dragged" style="display: none">
     <p>Drop to upload</p>
@@ -62,15 +65,439 @@ export default {
     Options,
   },
   methods: {
-    updateLabelGroups() {
-      updateLabelGroups()
-    }
+    updateLabelGroups() { updateLabelGroups() },
+    applyDefaultStyle() { applyDefaultStyle() },
   },
 }
 
 'use strict'
 
+let svg
+let defs
+let viewbox
+let ocean
+let oceanLayers
+let oceanPattern
+let landmass
+let terrs
+let grid
+let overlay
+let rivers
+let terrain
+let cults
+let regions
+let borders
+let stateBorders
+let neutralBorders
+let lakes
+let routes
+let roads
+let trails
+let searoutes
+let coastline
 let labels
+let burgLabels
+let icons
+let burgIcons
+let markers
+let ruler
+let debug
+let seed
+let params
+let voronoi
+let diagram
+let polygons
+let spacing
+let points
+let heights
+let modules
+let customization
+let history
+let historyStage
+let elSelected
+let autoResize
+let graphSize
+let cells
+let land
+let riversData
+let manors
+let states
+let features
+let notes
+let queue
+let defaultCultures
+let cultures
+let chain
+let nameBases
+let nameBase
+let cultureTree
+
+// convert RGB color string to HEX without #
+function toHEX(rgb) {
+  if (rgb.charAt(0) === '#') {return rgb}
+  rgb = rgb.match(/^rgba?[\s+]?\([\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?/i)
+  return (rgb && rgb.length === 4) ? '#' +
+                                     ('0' + parseInt(rgb[1], 10).toString(16)).slice(-2) +
+                                     ('0' + parseInt(rgb[2], 10).toString(16)).slice(-2) +
+                                     ('0' + parseInt(rgb[3], 10).toString(16)).slice(-2) : ''
+}
+
+// random number in a range
+function rand(min, max) {
+  if (min === undefined && !max === undefined) return Math.random()
+  if (max === undefined) {
+    max = min
+    min = 0
+  }
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+// round value to d decimals
+function rn(v, d) {
+  var d = d || 0
+  const m = Math.pow(10, d)
+  return Math.round(v * m) / m
+}
+
+// round string to d decimals
+function round(s, d) {
+  var d = d || 1
+  return s.replace(/[\d\.-][\d\.e-]*/g, function(n) {return rn(n, d)})
+}
+
+// corvent number to short string with SI postfix
+function si(n) {
+  if (n >= 1e9) {return rn(n / 1e9, 1) + 'B'}
+  if (n >= 1e8) {return rn(n / 1e6) + 'M'}
+  if (n >= 1e6) {return rn(n / 1e6, 1) + 'M'}
+  if (n >= 1e4) {return rn(n / 1e3) + 'K'}
+  if (n >= 1e3) {return rn(n / 1e3, 1) + 'K'}
+  return rn(n)
+}
+
+// getInteger number from user input data
+function getInteger(value) {
+  const metric = value.slice(-1)
+  if (metric === 'K') {return parseInt(value.slice(0, -1) * 1e3)}
+  if (metric === 'M') {return parseInt(value.slice(0, -1) * 1e6)}
+  if (metric === 'B') {return parseInt(value.slice(0, -1) * 1e9)}
+  return parseInt(value)
+}
+
+// downalod map as SVG or PNG file
+function saveAsImage(type) {
+  console.time('saveAsImage')
+  const webSafe = ['Georgia', 'Times+New+Roman', 'Comic+Sans+MS', 'Lucida+Sans+Unicode', 'Courier+New', 'Verdana', 'Arial', 'Impact']
+  // get non-standard fonts used for labels to fetch them from web
+  const fontsInUse = [] // to store fonts currently in use
+  labels.selectAll('g').each(function(d) {
+    const font = d3.select(this).attr('data-font')
+    if (!font) return
+    if (webSafe.indexOf(font) !== -1) return // do not fetch web-safe fonts
+    if (fontsInUse.indexOf(font) === -1) fontsInUse.push(font)
+  })
+  const fontsToLoad = 'https://fonts.googleapis.com/css?family=' + fontsInUse.join('|')
+
+  // clone svg
+  const cloneEl = document.getElementsByTagName('svg')[0].cloneNode(true)
+  cloneEl.id = 'fantasyMap'
+  document.getElementsByTagName('body')[0].appendChild(cloneEl)
+  const clone = d3.select('#fantasyMap')
+
+  // rteset transform for svg
+  if (type === 'svg') {
+    clone.attr('width', graphWidth).attr('height', graphHeight)
+    clone.select('#viewbox').attr('transform', null)
+    if (svgWidth !== graphWidth || svgHeight !== graphHeight) {
+      // move scale bar to right bottom corner
+      const el = clone.select('#scaleBar')
+      if (!el.size()) return
+      const bbox = el.select('rect').node().getBBox()
+      const tr = [graphWidth - bbox.width, graphHeight - (bbox.height - 10)]
+      el.attr('transform', 'translate(' + rn(tr[0]) + ',' + rn(tr[1]) + ')')
+    }
+
+    // to fix use elements sizing
+    clone.selectAll('use').each(function() {
+      const size = this.parentNode.getAttribute('size') || 1
+      this.setAttribute('width', size + 'px')
+      this.setAttribute('height', size + 'px')
+    })
+
+    // clean attributes
+    //clone.selectAll("*").each(function() {
+    //  const attributes = this.attributes;
+    //  for (let i = 0; i < attributes.length; i++) {
+    //    const attr = attributes[i];
+    //    if (attr.value === "" || attr.name.includes("data")) {
+    //      this.removeAttribute(attr.name);
+    //    }
+    //  }
+    //});
+
+  }
+
+  // for each g element get inline style
+  const emptyG = clone.append('g').node()
+  const defaultStyles = window.getComputedStyle(emptyG)
+
+  // show hidden labels but in reduced size
+  clone.select('#labels').selectAll('.hidden').each(function(e) {
+    const size = d3.select(this).attr('font-size')
+    d3.select(this).classed('hidden', false).attr('font-size', rn(size * 0.4, 2))
+  })
+
+  // save group css to style attribute
+  clone.selectAll('g, #ruler > g > *, #scaleBar > text').each(function(d) {
+    const compStyle = window.getComputedStyle(this)
+    let style = ''
+    for (let i = 0; i < compStyle.length; i++) {
+      const key = compStyle[i]
+      const value = compStyle.getPropertyValue(key)
+      // Firefox mask hack
+      if (key === 'mask-image' && value !== defaultStyles.getPropertyValue(key)) {
+        style += 'mask-image: url(\'#shape\');'
+        continue
+      }
+      if (key === 'cursor') continue // cursor should be default
+      if (this.hasAttribute(key)) continue // don't add style if there is the same attribute
+      if (value === defaultStyles.getPropertyValue(key)) continue
+      style += key + ':' + value + ';'
+    }
+    if (style != '') this.setAttribute('style', style)
+  })
+  emptyG.remove()
+
+  // load fonts as dataURI so they will be available in downloaded svg/png
+  GFontToDataURI(fontsToLoad).then(cssRules => {
+    clone.select('defs').append('style').text(cssRules.join('\n'))
+    const svg_xml = (new XMLSerializer()).serializeToString(clone.node())
+    clone.remove()
+    const blob = new Blob([svg_xml], {type: 'image/svg+xml;charset=utf-8'})
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.target = '_blank'
+    if (type === 'png') {
+      const ratio = svgHeight / svgWidth
+      canvas.width = svgWidth * pngResolutionInput.value
+      canvas.height = svgHeight * pngResolutionInput.value
+      const img = new Image()
+      img.src = url
+      img.onload = function() {
+        window.URL.revokeObjectURL(url)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        link.download = 'fantasy_map_' + Date.now() + '.png'
+        canvas.toBlob(function(blob) {
+          link.href = window.URL.createObjectURL(blob)
+          document.body.appendChild(link)
+          link.click()
+          window.setTimeout(function() {window.URL.revokeObjectURL(link.href)}, 5000)
+        })
+        canvas.style.opacity = 0
+        canvas.width = svgWidth
+        canvas.height = svgHeight
+      }
+    } else {
+      link.download = 'fantasy_map_' + Date.now() + '.svg'
+      link.href = url
+      document.body.appendChild(link)
+      link.click()
+    }
+    console.timeEnd('saveAsImage')
+    window.setTimeout(function() {window.URL.revokeObjectURL(url)}, 5000)
+  })
+}
+
+// Code from Kaiido's answer:
+// https://stackoverflow.com/questions/42402584/how-to-use-google-fonts-in-canvas-when-drawing-dom-objects-in-svg
+function GFontToDataURI(url) {
+  return fetch(url) // first fecth the embed stylesheet page
+    .then(resp => resp.text()) // we only need the text of it
+    .then(text => {
+      let s = document.createElement('style')
+      s.innerHTML = text
+      document.head.appendChild(s)
+      let styleSheet = Array.prototype.filter.call(
+        document.styleSheets,
+        sS => sS.ownerNode === s)[0]
+      let FontRule = rule => {
+        let src = rule.style.getPropertyValue('src')
+        let family = rule.style.getPropertyValue('font-family')
+        let url = src.split('url(')[1].split(')')[0]
+        return {
+          rule: rule,
+          src: src,
+          url: url.substring(url.length - 1, 1)
+        }
+      }
+      let fontRules = [], fontProms = []
+
+      for (let r of styleSheet.cssRules) {
+        let fR = FontRule(r)
+        fontRules.push(fR)
+        fontProms.push(
+          fetch(fR.url) // fetch the actual font-file (.woff)
+            .then(resp => resp.blob())
+            .then(blob => {
+              return new Promise(resolve => {
+                let f = new FileReader()
+                f.onload = e => resolve(f.result)
+                f.readAsDataURL(blob)
+              })
+            })
+            .then(dataURL => {
+              return fR.rule.cssText.replace(fR.url, dataURL)
+            })
+        )
+      }
+      document.head.removeChild(s) // clean up
+      return Promise.all(fontProms) // wait for all this has been done
+    })
+}
+
+// return value (v) if defined with specified number of decimals (d)
+// else return "no" or attribute (r)
+function ifDefined(v, r, d) {
+  if (v === null || v === undefined) return r || 'no'
+  if (d) return v.toFixed(d)
+  return v
+}
+
+// get user-friendly (real-world) height value from map data
+function getFriendlyHeight(h) {
+  let exponent = +heightExponent.value
+  let unit = heightUnit.value
+  let unitRatio = 1 // default calculations are in meters
+  if (unit === 'ft') unitRatio = 3.28 // if foot
+  if (unit === 'f') unitRatio = 0.5468 // if fathom
+  let height = -990
+  if (h >= 20) height = Math.pow(h - 18, exponent)
+  if (h < 20 && h > 0) height = (h - 20) / h * 50
+  return h + ' (' + rn(height * unitRatio) + ' ' + unit + ')'
+}
+
+// Get cell info on mouse move (useful for debugging)
+function moved() {
+  const point = d3.mouse(this)
+  const i = diagram.find(point[0], point[1]).index
+
+  // update cellInfo
+  if (i) {
+    const p = cells[i] // get cell
+    infoX.innerHTML = rn(point[0])
+    infoY.innerHTML = rn(point[1])
+    infoCell.innerHTML = i
+    infoArea.innerHTML = ifDefined(p.area, 'n/a', 2)
+    if (customization === 1) {
+      infoHeight.innerHTML = getFriendlyHeight(heights[i])
+    } else {infoHeight.innerHTML = getFriendlyHeight(p.height)}
+    infoFlux.innerHTML = ifDefined(p.flux, 'n/a', 2)
+    let country = p.region === undefined ? 'n/a' : p.region === 'neutral' ? 'neutral' :
+                                                   states[p.region].name + ' (' + p.region + ')'
+    infoCountry.innerHTML = country
+    let culture = ifDefined(p.culture) !== 'no' ?
+                  cultures[p.culture].name + ' (' + p.culture + ')' : 'n/a'
+    infoCulture.innerHTML = culture
+    infoPopulation.innerHTML = ifDefined(p.pop, 'n/a', 2)
+    infoBurg.innerHTML =
+      ifDefined(p.manor) !== 'no' ? manors[p.manor].name + ' (' + p.manor + ')' : 'no'
+    const feature = features[p.fn]
+    if (feature !== undefined) {
+      const fType = feature.land ? 'Island' : feature.border ? 'Ocean' : 'Lake'
+      infoFeature.innerHTML = fType + ' (' + p.fn + ')'
+    } else {
+      infoFeature.innerHTML = 'n/a'
+    }
+  }
+
+  // update tooltip
+  if (toggleTooltips.checked) {
+    tooltip.innerHTML = tooltip.getAttribute('data-main')
+    const tag = event.target.tagName
+    const path = event.composedPath()
+    const group = path[path.length - 7].id
+    const subgroup = path[path.length - 8].id
+    if (group === 'rivers') tip('Click to open River Editor')
+    if (group === 'routes') tip('Click to open Route Editor')
+    if (group === 'terrain') tip('Click to open Relief Icon Editor')
+    if (group === 'labels') tip('Click to open Label Editor')
+    if (group === 'icons') tip('Click to open Icon Editor')
+    if (group === 'markers') tip('Click to open Marker Editor')
+    if (group === 'ruler') {
+      if (tag === 'path' || tag === 'line') tip('Drag to move the measurer')
+      if (tag === 'text') tip('Click to remove the measurer')
+      if (tag === 'circle') tip('Drag to adjust the measurer')
+    }
+    if (subgroup === 'burgIcons') tip('Click to open Burg Editor')
+    if (subgroup === 'burgLabels') tip('Click to open Burg Editor')
+
+    // show legend on hover (if any)
+    let id = event.target.id
+    if (id === '') id = event.target.parentNode.id
+    if (subgroup === 'burgLabels') id = 'burg' + event.target.getAttribute('data-id')
+
+    let note = notes.find(note => note.id === id)
+    let legend = document.getElementById('legend')
+    let legendHeader = document.getElementById('legendHeader')
+    let legendBody = document.getElementById('legendBody')
+    if (note !== undefined && note.legend !== '') {
+      legend.style.display = 'block'
+      legendHeader.innerHTML = note.name
+      legendBody.innerHTML = note.legend
+    } else {
+      legend.style.display = 'none'
+      legendHeader.innerHTML = ''
+      legendBody.innerHTML = ''
+    }
+  }
+
+  // draw line for ranges placing for heightmap Customization
+  if (customization === 1) {
+    const line = debug.selectAll('.line')
+    if (debug.selectAll('.tag').size() === 1) {
+      const x = +debug.select('.tag').attr('cx')
+      const y = +debug.select('.tag').attr('cy')
+      if (line.size()) {
+        line.attr('x1', x).attr('y1', y).attr('x2', point[0]).attr('y2', point[1])
+      } else {
+        debug.insert('line', ':first-child').attr('class', 'line')
+             .attr('x1', x).attr('y1', y).attr('x2', point[0]).attr('y2', point[1])
+      }
+    } else {
+      line.remove()
+    }
+  }
+
+  // change radius circle for Customization
+  if (customization > 0) {
+    const brush = $('#brushesButtons > .pressed')
+    const brushId = brush.attr('id')
+    if (brushId === 'brushRange' || brushId === 'brushTrough') return
+    if (customization !== 5 && !brush.length && !$('div.selected').length) return
+    let radius = 0
+    if (customization === 1) {
+      radius = brushRadius.value
+      if (brushId === 'brushHill' || brushId === 'brushPit') {
+        radius = Math.pow(brushPower.value * 4, .5)
+      }
+    } else if (customization === 2) radius = countriesManuallyBrush.value
+    else if (customization === 4) radius = culturesManuallyBrush.value
+    else if (customization === 5) radius = reliefBulkRemoveRadius.value
+
+    const r = rn(6 / graphSize * radius, 1)
+    let clr = '#373737'
+    if (customization === 2) {
+      const state = +$('div.selected').attr('id').slice(5)
+      clr = states[state].color === 'neutral' ? 'white' : states[state].color
+    }
+    if (customization === 4) {
+      const culture = +$('div.selected').attr('id').slice(7)
+      clr = cultures[culture].color
+    }
+    moveCircle(point[0], point[1], r, clr)
+  }
+}
+
 // update Label Groups displayed on Style tab
 function updateLabelGroups() {
   if ($('#styleElementSelect').value !== 'labels') return
@@ -94,41 +521,104 @@ function updateLabelGroups() {
   })
 }
 
+// restore initial style
+function applyDefaultStyle() {
+  viewbox.on('touchmove mousemove', moved)
+  landmass.attr('opacity', 1).attr('fill', '#eef6fb')
+  coastline.attr('opacity', .5).attr('stroke', '#1f3846').attr('stroke-width', .7)
+           .attr('filter', 'url(#dropShadow)')
+  regions.attr('opacity', .4)
+  stateBorders.attr('opacity', .8).attr('stroke', '#56566d').attr('stroke-width', .7)
+              .attr('stroke-dasharray', '1.2 1.5').attr('stroke-linecap', 'butt')
+  neutralBorders.attr('opacity', .8).attr('stroke', '#56566d').attr('stroke-width', .5)
+                .attr('stroke-dasharray', '1 1.5').attr('stroke-linecap', 'butt')
+  cults.attr('opacity', .6)
+  rivers.attr('opacity', 1).attr('fill', '#5d97bb')
+  lakes.attr('opacity', .5).attr('fill', '#a6c1fd').attr('stroke', '#5f799d')
+       .attr('stroke-width', .7)
+  icons.selectAll('g').attr('opacity', 1).attr('fill', '#ffffff').attr('stroke', '#3e3e4b')
+  roads.attr('opacity', .9).attr('stroke', '#d06324').attr('stroke-width', .35)
+       .attr('stroke-dasharray', '1.5').attr('stroke-linecap', 'butt')
+  trails.attr('opacity', .9).attr('stroke', '#d06324').attr('stroke-width', .15)
+        .attr('stroke-dasharray', '.8 1.6').attr('stroke-linecap', 'butt')
+  searoutes.attr('opacity', .8).attr('stroke', '#ffffff').attr('stroke-width', .35)
+           .attr('stroke-dasharray', '1 2').attr('stroke-linecap', 'round')
+  grid.attr('opacity', 1).attr('stroke', '#808080').attr('stroke-width', .1)
+  ruler.attr('opacity', 1).style('display', 'none').attr('filter', 'url(#dropShadow)')
+  overlay.attr('opacity', .8).attr('stroke', '#808080').attr('stroke-width', .5)
+  markers.attr('filter', 'url(#dropShadow01)')
+
+  // ocean style
+  svg.style('background-color', '#000000')
+  ocean.attr('opacity', 1)
+  oceanLayers.select('rect').attr('fill', '#53679f')
+  oceanLayers.attr('filter', '')
+  oceanPattern.attr('opacity', 1)
+  oceanLayers.selectAll('path').attr('display', null)
+  styleOceanPattern.checked = true
+  styleOceanLayers.checked = true
+
+  labels.attr('opacity', 1).attr('stroke', '#3a3a3a').attr('stroke-width', 0)
+  let size = rn(8 - regionsInput.value / 20)
+  if (size < 3) size = 3
+  burgLabels.select('#capitals').attr('fill', '#3e3e4b').attr('opacity', 1)
+            .attr('font-family', 'Almendra SC').attr('data-font', 'Almendra+SC')
+            .attr('font-size', size).attr('data-size', size)
+  burgLabels.select('#towns').attr('fill', '#3e3e4b').attr('opacity', 1)
+            .attr('font-family', 'Almendra SC').attr('data-font', 'Almendra+SC')
+            .attr('font-size', 3).attr('data-size', 4)
+  burgIcons.select('#capitals').attr('size', 1).attr('stroke-width', .24)
+           .attr('fill', '#ffffff').attr('stroke', '#3e3e4b').attr('fill-opacity', .7)
+           .attr('stroke-opacity', 1).attr('opacity', 1)
+  burgIcons.select('#towns').attr('size', .5).attr('stroke-width', .12).attr('fill', '#ffffff')
+           .attr('stroke', '#3e3e4b').attr('fill-opacity', .7).attr('stroke-opacity', 1)
+           .attr('opacity', 1)
+  size = rn(16 - regionsInput.value / 6)
+  if (size < 6) size = 6
+  labels.select('#countries').attr('fill', '#3e3e4b').attr('opacity', 1)
+        .attr('font-family', 'Almendra SC').attr('data-font', 'Almendra+SC')
+        .attr('font-size', size).attr('data-size', size)
+  icons.select('#capital-anchors').attr('fill', '#ffffff').attr('stroke', '#3e3e4b')
+       .attr('stroke-width', 1.2).attr('size', 2)
+  icons.select('#town-anchors').attr('fill', '#ffffff').attr('stroke', '#3e3e4b')
+       .attr('stroke-width', 1.2).attr('size', 1)
+}
+
 function fantasyMap() {
   const version = '0.60b'
   document.title += ' v. ' + version
 
   // Declare variables
-  let svg = d3.select('svg')
-  let defs = svg.select('#deftemp')
-  let viewbox = svg.append('g').attr('id', 'viewbox')
-  let ocean = viewbox.append('g').attr('id', 'ocean')
-  let oceanLayers = ocean.append('g').attr('id', 'oceanLayers')
-  let oceanPattern = ocean.append('g').attr('id', 'oceanPattern')
-  let landmass = viewbox.append('g').attr('id', 'landmass')
-  let terrs = viewbox.append('g').attr('id', 'terrs')
-  let grid = viewbox.append('g').attr('id', 'grid')
-  let overlay = viewbox.append('g').attr('id', 'overlay')
-  let rivers = viewbox.append('g').attr('id', 'rivers')
-  let terrain = viewbox.append('g').attr('id', 'terrain')
-  let cults = viewbox.append('g').attr('id', 'cults')
-  let regions = viewbox.append('g').attr('id', 'regions')
-  let borders = viewbox.append('g').attr('id', 'borders')
-  let stateBorders = borders.append('g').attr('id', 'stateBorders')
-  let neutralBorders = borders.append('g').attr('id', 'neutralBorders')
-  let lakes = viewbox.append('g').attr('id', 'lakes')
-  let routes = viewbox.append('g').attr('id', 'routes')
-  let roads = routes.append('g').attr('id', 'roads').attr('data-type', 'land')
-  let trails = routes.append('g').attr('id', 'trails').attr('data-type', 'land')
-  let searoutes = routes.append('g').attr('id', 'searoutes').attr('data-type', 'sea')
-  let coastline = viewbox.append('g').attr('id', 'coastline')
+  svg = d3.select('svg')
+  defs = svg.select('#deftemp')
+  viewbox = svg.append('g').attr('id', 'viewbox')
+  ocean = viewbox.append('g').attr('id', 'ocean')
+  oceanLayers = ocean.append('g').attr('id', 'oceanLayers')
+  oceanPattern = ocean.append('g').attr('id', 'oceanPattern')
+  landmass = viewbox.append('g').attr('id', 'landmass')
+  terrs = viewbox.append('g').attr('id', 'terrs')
+  grid = viewbox.append('g').attr('id', 'grid')
+  overlay = viewbox.append('g').attr('id', 'overlay')
+  rivers = viewbox.append('g').attr('id', 'rivers')
+  terrain = viewbox.append('g').attr('id', 'terrain')
+  cults = viewbox.append('g').attr('id', 'cults')
+  regions = viewbox.append('g').attr('id', 'regions')
+  borders = viewbox.append('g').attr('id', 'borders')
+  stateBorders = borders.append('g').attr('id', 'stateBorders')
+  neutralBorders = borders.append('g').attr('id', 'neutralBorders')
+  lakes = viewbox.append('g').attr('id', 'lakes')
+  routes = viewbox.append('g').attr('id', 'routes')
+  roads = routes.append('g').attr('id', 'roads').attr('data-type', 'land')
+  trails = routes.append('g').attr('id', 'trails').attr('data-type', 'land')
+  searoutes = routes.append('g').attr('id', 'searoutes').attr('data-type', 'sea')
+  coastline = viewbox.append('g').attr('id', 'coastline')
   labels = viewbox.append('g').attr('id', 'labels')
-  let burgLabels = labels.append('g').attr('id', 'burgLabels')
-  let icons = viewbox.append('g').attr('id', 'icons')
-  let burgIcons = icons.append('g').attr('id', 'burgIcons')
-  let markers = viewbox.append('g').attr('id', 'markers')
-  let ruler = viewbox.append('g').attr('id', 'ruler')
-  let debug = viewbox.append('g').attr('id', 'debug')
+  burgLabels = labels.append('g').attr('id', 'burgLabels')
+  icons = viewbox.append('g').attr('id', 'icons')
+  burgIcons = icons.append('g').attr('id', 'burgIcons')
+  markers = viewbox.append('g').attr('id', 'markers')
+  ruler = viewbox.append('g').attr('id', 'ruler')
+  debug = viewbox.append('g').attr('id', 'debug')
 
   labels.append('g').attr('id', 'countries')
   burgIcons.append('g').attr('id', 'capitals')
@@ -147,39 +637,29 @@ function fantasyMap() {
   oceanLayers.append('rect').attr('id', 'oceanBase')
 
   // main data variables
-  let seed
-  let params
-  let voronoi
-  let diagram
-  let polygons
-  let spacing
-  let points = []
-  let heights
+  points = []
   // Common variables
-  const modules = {}
-  let customization = 0
-  let history = []
-  let historyStage = 0
-  let elSelected
-  let autoResize = true
-  let graphSize
-  let cells = []
-  let land = []
-  let riversData = []
-  let manors = []
-  let states = []
-  let features = []
-  let notes = []
-  let queue = []
+  modules = {}
+  customization = 0
+  history = []
+  historyStage = 0
+  autoResize = true
+  cells = []
+  land = []
+  riversData = []
+  manors = []
+  states = []
+  features = []
+  notes = []
+  queue = []
   const fonts = ['Almendra+SC', 'Georgia', 'Times+New+Roman', 'Comic+Sans+MS', 'Lucida+Sans+Unicode', 'Courier+New']
 
   // Cultures-related data
-  let defaultCultures = []
-  let cultures = []
-  const chain = {}
-  let nameBases = []
-  let nameBase = []
-  let cultureTree
+  defaultCultures = []
+  cultures = []
+  chain = {}
+  nameBases = []
+  nameBase = []
   const vowels = 'aeiouy'
 
   // canvas element for raster images
@@ -221,16 +701,6 @@ function fantasyMap() {
   $('#templateBody').sortable({items: 'div:not(div[data-type=\'Mountain\'])'})
   $('#mapLayers, #templateBody').disableSelection()
 
-  const drag = d3.drag()
-                 .container(function() {
-                   return this
-                 })
-                 .subject(function() {
-                   const p = [d3.event.x, d3.event.y]
-                   return [p, p]
-                 })
-                 .on('start', dragstarted)
-
   function zoomed() {
     const scaleDiff = Math.abs(scale - d3.event.transform.k)
     scale = d3.event.transform.k
@@ -242,13 +712,6 @@ function fantasyMap() {
       invokeActiveZooming()
       drawScaleBar()
     }
-  }
-
-  // Manually update viewbox
-  function zoomUpdate(duration) {
-    const dur = duration || 0
-    const transform = d3.zoomIdentity.translate(viewX, viewY).scale(scale)
-    svg.transition().duration(dur).call(zoom.transform, transform)
   }
 
   // Zoom to specific point (x,y - coods, z - scale, d - duration)
@@ -388,12 +851,6 @@ function fantasyMap() {
     console.log(' seed: ' + seed)
     $('#optionsSeed').value = seed
     seedrandom(seed)
-  }
-
-  function updateURL() {
-    const url = new URL(window.location.href)
-    url.searchParams.set('seed', seed)
-    if (url.protocol !== 'file:') window.history.pushState({seed}, '', 'url.search')
   }
 
   // load options from LocalStorage is any
@@ -589,149 +1046,6 @@ function fantasyMap() {
     console.timeEnd('calculateVoronoi')
   }
 
-  // Get cell info on mouse move (useful for debugging)
-  function moved() {
-    const point = d3.mouse(this)
-    const i = diagram.find(point[0], point[1]).index
-
-    // update cellInfo
-    if (i) {
-      const p = cells[i] // get cell
-      infoX.innerHTML = rn(point[0])
-      infoY.innerHTML = rn(point[1])
-      infoCell.innerHTML = i
-      infoArea.innerHTML = ifDefined(p.area, 'n/a', 2)
-      if (customization === 1) {
-        infoHeight.innerHTML = getFriendlyHeight(heights[i])
-      } else {infoHeight.innerHTML = getFriendlyHeight(p.height)}
-      infoFlux.innerHTML = ifDefined(p.flux, 'n/a', 2)
-      let country = p.region === undefined ? 'n/a' : p.region === 'neutral' ? 'neutral' :
-                                                     states[p.region].name + ' (' + p.region + ')'
-      infoCountry.innerHTML = country
-      let culture = ifDefined(p.culture) !== 'no' ?
-                    cultures[p.culture].name + ' (' + p.culture + ')' : 'n/a'
-      infoCulture.innerHTML = culture
-      infoPopulation.innerHTML = ifDefined(p.pop, 'n/a', 2)
-      infoBurg.innerHTML =
-        ifDefined(p.manor) !== 'no' ? manors[p.manor].name + ' (' + p.manor + ')' : 'no'
-      const feature = features[p.fn]
-      if (feature !== undefined) {
-        const fType = feature.land ? 'Island' : feature.border ? 'Ocean' : 'Lake'
-        infoFeature.innerHTML = fType + ' (' + p.fn + ')'
-      } else {
-        infoFeature.innerHTML = 'n/a'
-      }
-    }
-
-    // update tooltip
-    if (toggleTooltips.checked) {
-      tooltip.innerHTML = tooltip.getAttribute('data-main')
-      const tag = event.target.tagName
-      const path = event.composedPath()
-      const group = path[path.length - 7].id
-      const subgroup = path[path.length - 8].id
-      if (group === 'rivers') tip('Click to open River Editor')
-      if (group === 'routes') tip('Click to open Route Editor')
-      if (group === 'terrain') tip('Click to open Relief Icon Editor')
-      if (group === 'labels') tip('Click to open Label Editor')
-      if (group === 'icons') tip('Click to open Icon Editor')
-      if (group === 'markers') tip('Click to open Marker Editor')
-      if (group === 'ruler') {
-        if (tag === 'path' || tag === 'line') tip('Drag to move the measurer')
-        if (tag === 'text') tip('Click to remove the measurer')
-        if (tag === 'circle') tip('Drag to adjust the measurer')
-      }
-      if (subgroup === 'burgIcons') tip('Click to open Burg Editor')
-      if (subgroup === 'burgLabels') tip('Click to open Burg Editor')
-
-      // show legend on hover (if any)
-      let id = event.target.id
-      if (id === '') id = event.target.parentNode.id
-      if (subgroup === 'burgLabels') id = 'burg' + event.target.getAttribute('data-id')
-
-      let note = notes.find(note => note.id === id)
-      let legend = document.getElementById('legend')
-      let legendHeader = document.getElementById('legendHeader')
-      let legendBody = document.getElementById('legendBody')
-      if (note !== undefined && note.legend !== '') {
-        legend.style.display = 'block'
-        legendHeader.innerHTML = note.name
-        legendBody.innerHTML = note.legend
-      } else {
-        legend.style.display = 'none'
-        legendHeader.innerHTML = ''
-        legendBody.innerHTML = ''
-      }
-    }
-
-    // draw line for ranges placing for heightmap Customization
-    if (customization === 1) {
-      const line = debug.selectAll('.line')
-      if (debug.selectAll('.tag').size() === 1) {
-        const x = +debug.select('.tag').attr('cx')
-        const y = +debug.select('.tag').attr('cy')
-        if (line.size()) {
-          line.attr('x1', x).attr('y1', y).attr('x2', point[0]).attr('y2', point[1])
-        } else {
-          debug.insert('line', ':first-child').attr('class', 'line')
-               .attr('x1', x).attr('y1', y).attr('x2', point[0]).attr('y2', point[1])
-        }
-      } else {
-        line.remove()
-      }
-    }
-
-    // change radius circle for Customization
-    if (customization > 0) {
-      const brush = $('#brushesButtons > .pressed')
-      const brushId = brush.attr('id')
-      if (brushId === 'brushRange' || brushId === 'brushTrough') return
-      if (customization !== 5 && !brush.length && !$('div.selected').length) return
-      let radius = 0
-      if (customization === 1) {
-        radius = brushRadius.value
-        if (brushId === 'brushHill' || brushId === 'brushPit') {
-          radius = Math.pow(brushPower.value * 4, .5)
-        }
-      } else if (customization === 2) radius = countriesManuallyBrush.value
-      else if (customization === 4) radius = culturesManuallyBrush.value
-      else if (customization === 5) radius = reliefBulkRemoveRadius.value
-
-      const r = rn(6 / graphSize * radius, 1)
-      let clr = '#373737'
-      if (customization === 2) {
-        const state = +$('div.selected').attr('id').slice(5)
-        clr = states[state].color === 'neutral' ? 'white' : states[state].color
-      }
-      if (customization === 4) {
-        const culture = +$('div.selected').attr('id').slice(7)
-        clr = cultures[culture].color
-      }
-      moveCircle(point[0], point[1], r, clr)
-    }
-  }
-
-  // return value (v) if defined with specified number of decimals (d)
-  // else return "no" or attribute (r)
-  function ifDefined(v, r, d) {
-    if (v === null || v === undefined) return r || 'no'
-    if (d) return v.toFixed(d)
-    return v
-  }
-
-  // get user-friendly (real-world) height value from map data
-  function getFriendlyHeight(h) {
-    let exponent = +heightExponent.value
-    let unit = heightUnit.value
-    let unitRatio = 1 // default calculations are in meters
-    if (unit === 'ft') unitRatio = 3.28 // if foot
-    if (unit === 'f') unitRatio = 0.5468 // if fathom
-    let height = -990
-    if (h >= 20) height = Math.pow(h - 18, exponent)
-    if (h < 20 && h > 0) height = (h - 20) / h * 50
-    return h + ' (' + rn(height * unitRatio) + ' ' + unit + ')'
-  }
-
   // move brush radius circle
   function moveCircle(x, y, r, c) {
     let circle = debug.selectAll('.circle')
@@ -739,138 +1053,6 @@ function fantasyMap() {
     circle.attr('cx', x).attr('cy', y)
     if (r) circle.attr('r', r)
     if (c) circle.attr('stroke', c)
-  }
-
-  // Drag actions
-  function dragstarted() {
-    const x0 = d3.event.x, y0 = d3.event.y,
-      c0 = diagram.find(x0, y0).index
-    let c1 = c0
-    let x1, y1
-    const opisometer = $('#addOpisometer').hasClass('pressed')
-    const planimeter = $('#addPlanimeter').hasClass('pressed')
-    const factor = rn(1 / Math.pow(scale, 0.3), 1)
-
-    if (opisometer || planimeter) {
-      $('#ruler').show()
-      const type = opisometer ? 'opisometer' : 'planimeter'
-      var rulerNew = ruler.append('g').attr('class', type)
-                          .call(d3.drag().on('start', elementDrag))
-      var points = [{scX: rn(x0, 2), scY: rn(y0, 2)}]
-      if (opisometer) {
-        var curve = rulerNew.append('path').attr('class', 'opisometer white')
-                            .attr('stroke-width', factor)
-        const dash = rn(30 / distanceScale.value, 2)
-        var curveGray = rulerNew.append('path').attr('class', 'opisometer gray')
-                                .attr('stroke-dasharray', dash).attr('stroke-width', factor)
-      } else {
-        var curve = rulerNew.append('path').attr('class', 'planimeter')
-                            .attr('stroke-width', factor)
-      }
-      var text = rulerNew.append('text').attr('dy', -1).attr('font-size', 10 * factor)
-    }
-
-    d3.event.on('drag', function() {
-      x1 = d3.event.x, y1 = d3.event.y
-      const c2 = diagram.find(x1, y1).index
-
-      // Heightmap customization
-      if (customization === 1) {
-        if (c2 === c1 && x1 !== x0 && y1 !== y0) return
-        c1 = c2
-        const brush = $('#brushesButtons > .pressed')
-        const id = brush.attr('id')
-        const power = +brushPower.value
-        if (id === 'brushHill') {
-          add(c2, 'hill', power)
-          updateHeightmap()
-        }
-        if (id === 'brushPit') {
-          addPit(1, power, c2)
-          updateHeightmap()
-        }
-        if (id !== 'brushRange' || id !== 'brushTrough') {
-          // move a circle to show approximate change radius
-          moveCircle(x1, y1)
-          updateCellsInRadius(c2, c0)
-        }
-      }
-
-      // Countries / cultures manuall assignment
-      if (customization === 2 || customization === 4) {
-        if ($('div.selected').length === 0) return
-        if (c2 === c1) return
-        c1 = c2
-        let radius = customization === 2 ? +countriesManuallyBrush.value :
-                     +culturesManuallyBrush.value
-        const r = rn(6 / graphSize * radius, 1)
-        moveCircle(x1, y1, r)
-        let selection = defineBrushSelection(c2, radius)
-        if (selection) {
-          if (customization === 2) changeStateForSelection(selection)
-          if (customization === 4) changeCultureForSelection(selection)
-        }
-      }
-
-      if (opisometer || planimeter) {
-        const l = points[points.length - 1]
-        const diff = Math.hypot(l.scX - x1, l.scY - y1)
-        if (diff > 5) {points.push({scX: x1, scY: y1})}
-        if (opisometer) {
-          lineGen.curve(d3.curveBasis)
-          var d = round(lineGen(points))
-          curve.attr('d', d)
-          curveGray.attr('d', d)
-          const dist = rn(curve.node().getTotalLength())
-          const label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
-          text.attr('x', x1).attr('y', y1 - 10).text(label)
-        } else {
-          lineGen.curve(d3.curveBasisClosed)
-          var d = round(lineGen(points))
-          curve.attr('d', d)
-        }
-      }
-    })
-
-    d3.event.on('end', function() {
-      if (customization === 1) updateHistory()
-      if (opisometer || planimeter) {
-        $('#addOpisometer, #addPlanimeter').removeClass('pressed')
-        restoreDefaultEvents()
-        if (opisometer) {
-          const dist = rn(curve.node().getTotalLength())
-          var c = curve.node().getPointAtLength(dist / 2)
-          const p = curve.node().getPointAtLength((dist / 2) - 1)
-          const label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
-          const atan = p.x > c.x ? Math.atan2(p.y - c.y, p.x - c.x) :
-                       Math.atan2(c.y - p.y, c.x - p.x)
-          const angle = rn(atan * 180 / Math.PI, 3)
-          const tr = 'rotate(' + angle + ' ' + c.x + ' ' + c.y + ')'
-          text.attr('data-points', JSON.stringify(points)).attr('data-dist', dist).attr('x', c.x)
-              .attr('y', c.y).attr('transform', tr).text(label).on('click', removeParent)
-          rulerNew.append('circle').attr('cx', points[0].scX).attr('cy', points[0].scY)
-                  .attr('r', 2 * factor).attr('stroke-width', 0.5 * factor)
-                  .attr('data-edge', 'start').call(d3.drag().on('start', opisometerEdgeDrag))
-          rulerNew.append('circle').attr('cx', points[points.length - 1].scX)
-                  .attr('cy', points[points.length - 1].scY).attr('r', 2 * factor)
-                  .attr('stroke-width', 0.5 * factor)
-                  .attr('data-edge', 'end').call(d3.drag().on('start', opisometerEdgeDrag))
-        } else {
-          const vertices = points.map(function(p) {
-            return [p.scX, p.scY]
-          })
-          const area = rn(Math.abs(d3.polygonArea(vertices))) // initial area as positive integer
-          let areaConv = area * Math.pow(distanceScale.value, 2) // convert area to distanceScale
-          areaConv = si(areaConv)
-          if (areaUnit.value === 'square') {
-            areaConv += ' ' + distanceUnit.value + '²'
-          } else {areaConv += ' ' + areaUnit.value}
-          var c = polylabel([vertices], 1.0) // pole of inaccessibility
-          text.attr('x', rn(c[0], 2)).attr('y', rn(c[1], 2)).attr('data-area', area)
-              .text(areaConv).on('click', removeParent)
-        }
-      }
-    })
   }
 
   // restore default drag (map panning) and cursor
@@ -906,91 +1088,6 @@ function fantasyMap() {
     }
     selection = $.grep(selection, function(e) {return cells[e].height >= 20})
     return selection
-  }
-
-  // change region within selection
-  function changeStateForSelection(selection) {
-    if (selection.length === 0) return
-    const temp = regions.select('#temp')
-    const stateNew = +$('div.selected').attr('id').slice(5)
-    const color = states[stateNew].color === 'neutral' ? 'white' : states[stateNew].color
-    selection.map(function(index) {
-      // keep stateOld and stateNew as integers!
-      const exists = temp.select('path[data-cell=\'' + index + '\']')
-      const region = cells[index].region === 'neutral' ? states.length - 1 : cells[index].region
-      const stateOld = exists.size() ? +exists.attr('data-state') : region
-      if (stateNew === stateOld) return
-      if (states[stateOld].capital === cells[index].manor) return // not allowed to re-draw calitals
-      // change of append new element
-      if (exists.size()) {
-        exists.attr('data-state', stateNew).attr('fill', color).attr('stroke', color)
-      } else {
-        temp.append('path').attr('data-cell', index).attr('data-state', stateNew)
-            .attr('d', 'M' + polygons[index].join('L') + 'Z')
-            .attr('fill', color).attr('stroke', color)
-      }
-    })
-  }
-
-  // change culture within selection
-  function changeCultureForSelection(selection) {
-    if (selection.length === 0) return
-    const cultureNew = +$('div.selected').attr('id').slice(7)
-    const clr = cultures[cultureNew].color
-    selection.map(function(index) {
-      const cult = cults.select('#cult' + index)
-      const cultureOld = cult.attr('data-culture') !== null
-                         ? +cult.attr('data-culture')
-                         : cells[index].culture
-      if (cultureOld === cultureNew) return
-      cult.attr('data-culture', cultureNew).attr('fill', clr).attr('stroke', clr)
-    })
-  }
-
-  // update cells in radius if non-feature brush selected
-  function updateCellsInRadius(cell, source) {
-    const power = +brushPower.value
-    let radius = +brushRadius.value
-    const brush = $('#brushesButtons > .pressed').attr('id')
-    if ($('#brushesButtons > .pressed').hasClass('feature')) {return}
-    // define selection besed on radius
-    let selection = [cell]
-    if (radius > 1) selection = selection.concat(cells[cell].neighbors)
-    if (radius > 2) {
-      let frontier = cells[cell].neighbors
-      while (radius > 2) {
-        let cycle = frontier.slice()
-        frontier = []
-        cycle.map(function(s) {
-          cells[s].neighbors.forEach(function(e) {
-            if (selection.indexOf(e) !== -1) {return}
-            selection.push(e)
-            frontier.push(e)
-          })
-        })
-        radius--
-      }
-    }
-    // change each cell in the selection
-    const sourceHeight = heights[source]
-    selection.map(function(s) {
-      // calculate changes
-      if (brush === 'brushElevate') {
-        if (heights[s] < 20) {heights[s] = 20} else {heights[s] += power}
-        if (heights[s] > 100) heights[s] = 100
-      }
-      if (brush === 'brushDepress') {
-        heights[s] -= power
-        if (heights[s] > 100) heights[s] = 0
-      }
-      if (brush === 'brushAlign') {heights[s] = sourceHeight}
-      if (brush === 'brushSmooth') {
-        let hs = [heights[s]]
-        cells[s].neighbors.forEach(function(e) {hs.push(heights[e])})
-        heights[s] = (heights[s] + d3.mean(hs)) / 2
-      }
-    })
-    updateHeightmapSelection(selection)
   }
 
   // Mouseclick events
@@ -1434,49 +1531,6 @@ function fantasyMap() {
       }
     }
     console.timeEnd('markFeatures')
-  }
-
-  // remove closed lakes near ocean
-  function reduceClosedLakes() {
-    console.time('reduceClosedLakes')
-    const fs = JSON.parse(JSON.stringify(features))
-    let lakesInit = lakesNow = features.reduce(function(s, f) {
-      return !f.land && !f.border ? s + 1 : s
-    }, 0)
-
-    for (let c = 0; c < cells.length && lakesNow > 0; c++) {
-      if (heights[c] < 20) continue // not land
-      if (cells[c].ctype !== 2) continue // not near water
-      let ocean = null, lake = null
-      // find land cells with lake and ocean nearby
-      cells[c].neighbors.forEach(function(n) {
-        if (heights[n] >= 20) return
-        const fn = cells[n].fn
-        if (features[fn].border !== false) ocean = fn
-        if (fs[fn].border === false) lake = fn
-      })
-      // if found, make it water and turn lake to ocean
-      if (ocean !== null && lake !== null) {
-        //debug.append("circle").attr("cx", cells[c].data[0]).attr("cy", cells[c].data[1]).attr("r", 2).attr("fill", "red");
-        lakesNow--
-        fs[lake].border = ocean
-        heights[c] = 19
-        cells[c].fn = ocean
-        cells[c].ctype = -1
-        cells[c].neighbors.forEach(function(e) {if (heights[e] >= 20) cells[e].ctype = 2})
-      }
-    }
-
-    if (lakesInit === lakesNow) return // nothing was changed
-    for (let i = 0; i < cells.length; i++) {
-      if (heights[i] >= 20) continue // not water
-      const fn = cells[i].fn
-      if (fs[fn].border !== features[fn].border) {
-        cells[i].fn = fs[fn].border
-        //debug.append("circle").attr("cx", cells[i].data[0]).attr("cy", cells[i].data[1]).attr("r", 1).attr("fill", "blue");
-      }
-    }
-    console.timeEnd('reduceClosedLakes')
   }
 
   function drawOcean() {
@@ -5221,33 +5275,6 @@ function fantasyMap() {
     return cameFrom
   }
 
-  function findLandPaths(start, type) {
-    // Dijkstra algorithm (not used now)
-    const queue = new PriorityQueue({comparator: function(a, b) {return a.p - b.p}})
-    const cameFrom = [], costTotal = []
-    cameFrom[start] = 'no', costTotal[start] = 0
-    queue.queue({e: start, p: 0})
-    while (queue.length > 0) {
-      const next = queue.dequeue().e
-      const pol = cells[next]
-      pol.neighbors.forEach(function(e) {
-        if (cells[e].height < 20) return
-        let cost = cells[e].height / 100 * 2
-        if (e.river !== undefined) cost -= 0.2
-        if (pol.region !== cells[e].region) cost += 1
-        if (cells[e].region === 'neutral') cost += 1
-        if (e.manor !== undefined) cost = 0.1
-        const costNew = costTotal[next] + cost
-        if (!cameFrom[e]) {
-          costTotal[e] = costNew
-          cameFrom[e] = next
-          queue.queue({e, p: costNew})
-        }
-      })
-    }
-    return cameFrom
-  }
-
   function findOceanPaths(start, end) {
     const queue = new PriorityQueue({comparator: function(a, b) {return a.p - b.p}})
     let next
@@ -6402,29 +6429,6 @@ function fantasyMap() {
     return line
   }
 
-  function dragged(e) {
-    const el = d3.select(this)
-    const x = d3.event.x
-    const y = d3.event.y
-    el.raise().classed('drag', true)
-    if (el.attr('x')) {
-      el.attr('x', x).attr('y', y + 0.8)
-      const matrix = el.attr('transform')
-      if (matrix) {
-        const angle = matrix.split('(')[1].split(')')[0].split(' ')[0]
-        const bbox = el.node().getBBox()
-        const rotate = 'rotate(' + angle + ' ' + (bbox.x + bbox.width / 2) + ' ' + (bbox.y + bbox.height / 2) + ')'
-        el.attr('transform', rotate)
-      }
-    } else {
-      el.attr('cx', x).attr('cy', y)
-    }
-  }
-
-  function dragended(d) {
-    d3.select(this).classed('drag', false)
-  }
-
   // Complete the map for the "customize" mode
   function getMap() {
     if (customization !== 1) {
@@ -6896,229 +6900,6 @@ function fantasyMap() {
       labelFontSelect.add(opt)
     }
     burgSelectDefaultFont.innerHTML = labelFontSelect.innerHTML
-  }
-
-  // convert RGB color string to HEX without #
-  function toHEX(rgb) {
-    if (rgb.charAt(0) === '#') {return rgb}
-    rgb = rgb.match(/^rgba?[\s+]?\([\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?/i)
-    return (rgb && rgb.length === 4) ? '#' +
-                                       ('0' + parseInt(rgb[1], 10).toString(16)).slice(-2) +
-                                       ('0' + parseInt(rgb[2], 10).toString(16)).slice(-2) +
-                                       ('0' + parseInt(rgb[3], 10).toString(16)).slice(-2) : ''
-  }
-
-  // random number in a range
-  function rand(min, max) {
-    if (min === undefined && !max === undefined) return Math.random()
-    if (max === undefined) {
-      max = min
-      min = 0
-    }
-    return Math.floor(Math.random() * (max - min + 1)) + min
-  }
-
-  // round value to d decimals
-  function rn(v, d) {
-    var d = d || 0
-    const m = Math.pow(10, d)
-    return Math.round(v * m) / m
-  }
-
-  // round string to d decimals
-  function round(s, d) {
-    var d = d || 1
-    return s.replace(/[\d\.-][\d\.e-]*/g, function(n) {return rn(n, d)})
-  }
-
-  // corvent number to short string with SI postfix
-  function si(n) {
-    if (n >= 1e9) {return rn(n / 1e9, 1) + 'B'}
-    if (n >= 1e8) {return rn(n / 1e6) + 'M'}
-    if (n >= 1e6) {return rn(n / 1e6, 1) + 'M'}
-    if (n >= 1e4) {return rn(n / 1e3) + 'K'}
-    if (n >= 1e3) {return rn(n / 1e3, 1) + 'K'}
-    return rn(n)
-  }
-
-  // getInteger number from user input data
-  function getInteger(value) {
-    const metric = value.slice(-1)
-    if (metric === 'K') {return parseInt(value.slice(0, -1) * 1e3)}
-    if (metric === 'M') {return parseInt(value.slice(0, -1) * 1e6)}
-    if (metric === 'B') {return parseInt(value.slice(0, -1) * 1e9)}
-    return parseInt(value)
-  }
-
-  // downalod map as SVG or PNG file
-  function saveAsImage(type) {
-    console.time('saveAsImage')
-    const webSafe = ['Georgia', 'Times+New+Roman', 'Comic+Sans+MS', 'Lucida+Sans+Unicode', 'Courier+New', 'Verdana', 'Arial', 'Impact']
-    // get non-standard fonts used for labels to fetch them from web
-    const fontsInUse = [] // to store fonts currently in use
-    labels.selectAll('g').each(function(d) {
-      const font = d3.select(this).attr('data-font')
-      if (!font) return
-      if (webSafe.indexOf(font) !== -1) return // do not fetch web-safe fonts
-      if (fontsInUse.indexOf(font) === -1) fontsInUse.push(font)
-    })
-    const fontsToLoad = 'https://fonts.googleapis.com/css?family=' + fontsInUse.join('|')
-
-    // clone svg
-    const cloneEl = document.getElementsByTagName('svg')[0].cloneNode(true)
-    cloneEl.id = 'fantasyMap'
-    document.getElementsByTagName('body')[0].appendChild(cloneEl)
-    const clone = d3.select('#fantasyMap')
-
-    // rteset transform for svg
-    if (type === 'svg') {
-      clone.attr('width', graphWidth).attr('height', graphHeight)
-      clone.select('#viewbox').attr('transform', null)
-      if (svgWidth !== graphWidth || svgHeight !== graphHeight) {
-        // move scale bar to right bottom corner
-        const el = clone.select('#scaleBar')
-        if (!el.size()) return
-        const bbox = el.select('rect').node().getBBox()
-        const tr = [graphWidth - bbox.width, graphHeight - (bbox.height - 10)]
-        el.attr('transform', 'translate(' + rn(tr[0]) + ',' + rn(tr[1]) + ')')
-      }
-
-      // to fix use elements sizing
-      clone.selectAll('use').each(function() {
-        const size = this.parentNode.getAttribute('size') || 1
-        this.setAttribute('width', size + 'px')
-        this.setAttribute('height', size + 'px')
-      })
-
-      // clean attributes
-      //clone.selectAll("*").each(function() {
-      //  const attributes = this.attributes;
-      //  for (let i = 0; i < attributes.length; i++) {
-      //    const attr = attributes[i];
-      //    if (attr.value === "" || attr.name.includes("data")) {
-      //      this.removeAttribute(attr.name);
-      //    }
-      //  }
-      //});
-
-    }
-
-    // for each g element get inline style
-    const emptyG = clone.append('g').node()
-    const defaultStyles = window.getComputedStyle(emptyG)
-
-    // show hidden labels but in reduced size
-    clone.select('#labels').selectAll('.hidden').each(function(e) {
-      const size = d3.select(this).attr('font-size')
-      d3.select(this).classed('hidden', false).attr('font-size', rn(size * 0.4, 2))
-    })
-
-    // save group css to style attribute
-    clone.selectAll('g, #ruler > g > *, #scaleBar > text').each(function(d) {
-      const compStyle = window.getComputedStyle(this)
-      let style = ''
-      for (let i = 0; i < compStyle.length; i++) {
-        const key = compStyle[i]
-        const value = compStyle.getPropertyValue(key)
-        // Firefox mask hack
-        if (key === 'mask-image' && value !== defaultStyles.getPropertyValue(key)) {
-          style += 'mask-image: url(\'#shape\');'
-          continue
-        }
-        if (key === 'cursor') continue // cursor should be default
-        if (this.hasAttribute(key)) continue // don't add style if there is the same attribute
-        if (value === defaultStyles.getPropertyValue(key)) continue
-        style += key + ':' + value + ';'
-      }
-      if (style != '') this.setAttribute('style', style)
-    })
-    emptyG.remove()
-
-    // load fonts as dataURI so they will be available in downloaded svg/png
-    GFontToDataURI(fontsToLoad).then(cssRules => {
-      clone.select('defs').append('style').text(cssRules.join('\n'))
-      const svg_xml = (new XMLSerializer()).serializeToString(clone.node())
-      clone.remove()
-      const blob = new Blob([svg_xml], {type: 'image/svg+xml;charset=utf-8'})
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.target = '_blank'
-      if (type === 'png') {
-        const ratio = svgHeight / svgWidth
-        canvas.width = svgWidth * pngResolutionInput.value
-        canvas.height = svgHeight * pngResolutionInput.value
-        const img = new Image()
-        img.src = url
-        img.onload = function() {
-          window.URL.revokeObjectURL(url)
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-          link.download = 'fantasy_map_' + Date.now() + '.png'
-          canvas.toBlob(function(blob) {
-            link.href = window.URL.createObjectURL(blob)
-            document.body.appendChild(link)
-            link.click()
-            window.setTimeout(function() {window.URL.revokeObjectURL(link.href)}, 5000)
-          })
-          canvas.style.opacity = 0
-          canvas.width = svgWidth
-          canvas.height = svgHeight
-        }
-      } else {
-        link.download = 'fantasy_map_' + Date.now() + '.svg'
-        link.href = url
-        document.body.appendChild(link)
-        link.click()
-      }
-      console.timeEnd('saveAsImage')
-      window.setTimeout(function() {window.URL.revokeObjectURL(url)}, 5000)
-    })
-  }
-
-  // Code from Kaiido's answer:
-  // https://stackoverflow.com/questions/42402584/how-to-use-google-fonts-in-canvas-when-drawing-dom-objects-in-svg
-  function GFontToDataURI(url) {
-    return fetch(url) // first fecth the embed stylesheet page
-      .then(resp => resp.text()) // we only need the text of it
-      .then(text => {
-        let s = document.createElement('style')
-        s.innerHTML = text
-        document.head.appendChild(s)
-        let styleSheet = Array.prototype.filter.call(
-          document.styleSheets,
-          sS => sS.ownerNode === s)[0]
-        let FontRule = rule => {
-          let src = rule.style.getPropertyValue('src')
-          let family = rule.style.getPropertyValue('font-family')
-          let url = src.split('url(')[1].split(')')[0]
-          return {
-            rule: rule,
-            src: src,
-            url: url.substring(url.length - 1, 1)
-          }
-        }
-        let fontRules = [], fontProms = []
-
-        for (let r of styleSheet.cssRules) {
-          let fR = FontRule(r)
-          fontRules.push(fR)
-          fontProms.push(
-            fetch(fR.url) // fetch the actual font-file (.woff)
-              .then(resp => resp.blob())
-              .then(blob => {
-                return new Promise(resolve => {
-                  let f = new FileReader()
-                  f.onload = e => resolve(f.result)
-                  f.readAsDataURL(blob)
-                })
-              })
-              .then(dataURL => {
-                return fR.rule.cssText.replace(fR.url, dataURL)
-              })
-          )
-        }
-        document.head.removeChild(s) // clean up
-        return Promise.all(fontProms) // wait for all this has been done
-      })
   }
 
   // Save in .map format, based on FileSystem API
@@ -8050,21 +7831,6 @@ function fantasyMap() {
         drawPerspective()
         return
       }
-    }
-    if (id === 'restoreStyle') {
-      alertMessage.innerHTML = 'Are you sure you want to restore default style?'
-      $('#alert').dialog({
-        resizable: false, title: 'Restore style',
-        buttons: {
-          Restore: function() {
-            applyDefaultStyle()
-            $(this).dialog('close')
-          },
-          Cancel: function() {
-            $(this).dialog('close')
-          }
-        }
-      })
     }
     if (parent === 'mapFilters') {
       $('svg').attr('filter', '')
@@ -10407,92 +10173,6 @@ function fantasyMap() {
       tr = [+scalePos[0] - bbox.width, +scalePos[1] - bbox.height]
     }
     el.attr('transform', 'translate(' + rn(tr[0]) + ',' + rn(tr[1]) + ')')
-  }
-
-  // restore initial style
-  function applyDefaultStyle() {
-    viewbox.on('touchmove mousemove', moved)
-    landmass.attr('opacity', 1).attr('fill', '#eef6fb')
-    coastline.attr('opacity', .5).attr('stroke', '#1f3846').attr('stroke-width', .7)
-             .attr('filter', 'url(#dropShadow)')
-    regions.attr('opacity', .4)
-    stateBorders.attr('opacity', .8).attr('stroke', '#56566d').attr('stroke-width', .7)
-                .attr('stroke-dasharray', '1.2 1.5').attr('stroke-linecap', 'butt')
-    neutralBorders.attr('opacity', .8).attr('stroke', '#56566d').attr('stroke-width', .5)
-                  .attr('stroke-dasharray', '1 1.5').attr('stroke-linecap', 'butt')
-    cults.attr('opacity', .6)
-    rivers.attr('opacity', 1).attr('fill', '#5d97bb')
-    lakes.attr('opacity', .5).attr('fill', '#a6c1fd').attr('stroke', '#5f799d')
-         .attr('stroke-width', .7)
-    icons.selectAll('g').attr('opacity', 1).attr('fill', '#ffffff').attr('stroke', '#3e3e4b')
-    roads.attr('opacity', .9).attr('stroke', '#d06324').attr('stroke-width', .35)
-         .attr('stroke-dasharray', '1.5').attr('stroke-linecap', 'butt')
-    trails.attr('opacity', .9).attr('stroke', '#d06324').attr('stroke-width', .15)
-          .attr('stroke-dasharray', '.8 1.6').attr('stroke-linecap', 'butt')
-    searoutes.attr('opacity', .8).attr('stroke', '#ffffff').attr('stroke-width', .35)
-             .attr('stroke-dasharray', '1 2').attr('stroke-linecap', 'round')
-    grid.attr('opacity', 1).attr('stroke', '#808080').attr('stroke-width', .1)
-    ruler.attr('opacity', 1).style('display', 'none').attr('filter', 'url(#dropShadow)')
-    overlay.attr('opacity', .8).attr('stroke', '#808080').attr('stroke-width', .5)
-    markers.attr('filter', 'url(#dropShadow01)')
-
-    // ocean style
-    svg.style('background-color', '#000000')
-    ocean.attr('opacity', 1)
-    oceanLayers.select('rect').attr('fill', '#53679f')
-    oceanLayers.attr('filter', '')
-    oceanPattern.attr('opacity', 1)
-    oceanLayers.selectAll('path').attr('display', null)
-    styleOceanPattern.checked = true
-    styleOceanLayers.checked = true
-
-    labels.attr('opacity', 1).attr('stroke', '#3a3a3a').attr('stroke-width', 0)
-    let size = rn(8 - regionsInput.value / 20)
-    if (size < 3) size = 3
-    burgLabels.select('#capitals').attr('fill', '#3e3e4b').attr('opacity', 1)
-              .attr('font-family', 'Almendra SC').attr('data-font', 'Almendra+SC')
-              .attr('font-size', size).attr('data-size', size)
-    burgLabels.select('#towns').attr('fill', '#3e3e4b').attr('opacity', 1)
-              .attr('font-family', 'Almendra SC').attr('data-font', 'Almendra+SC')
-              .attr('font-size', 3).attr('data-size', 4)
-    burgIcons.select('#capitals').attr('size', 1).attr('stroke-width', .24)
-             .attr('fill', '#ffffff').attr('stroke', '#3e3e4b').attr('fill-opacity', .7)
-             .attr('stroke-opacity', 1).attr('opacity', 1)
-    burgIcons.select('#towns').attr('size', .5).attr('stroke-width', .12).attr('fill', '#ffffff')
-             .attr('stroke', '#3e3e4b').attr('fill-opacity', .7).attr('stroke-opacity', 1)
-             .attr('opacity', 1)
-    size = rn(16 - regionsInput.value / 6)
-    if (size < 6) size = 6
-    labels.select('#countries').attr('fill', '#3e3e4b').attr('opacity', 1)
-          .attr('font-family', 'Almendra SC').attr('data-font', 'Almendra+SC')
-          .attr('font-size', size).attr('data-size', size)
-    icons.select('#capital-anchors').attr('fill', '#ffffff').attr('stroke', '#3e3e4b')
-         .attr('stroke-width', 1.2).attr('size', 2)
-    icons.select('#town-anchors').attr('fill', '#ffffff').attr('stroke', '#3e3e4b')
-         .attr('stroke-width', 1.2).attr('size', 1)
-  }
-
-  // update Label Groups displayed on Style tab
-  function updateLabelGroups() {
-    if ($('#styleElementSelect').value !== 'labels') return
-    const cont = d3.select('#styleLabelGroupItems')
-    cont.selectAll('button').remove()
-    labels.selectAll('g').each(function() {
-      const el = d3.select(this)
-      const id = el.attr('id')
-      const name = id.charAt(0).toUpperCase() + id.substr(1)
-      const state = el.classed('hidden')
-      if (id === 'burgLabels') return
-      cont.append('button').attr('id', id).text(name).classed('buttonoff', state)
-          .on('click', function() {
-            // toggle label group on click
-            if ($('#hideLabels').checked) $('#hideLabels').click()
-            const el = d3.select('#' + this.id)
-            const state = !el.classed('hidden')
-            el.classed('hidden', state)
-            d3.select(this).classed('buttonoff', state)
-          })
-    })
   }
 
   $('#styleFillInput').on('input', function() {

@@ -30,7 +30,10 @@
       </button>
     </div>
     <LayoutContent/>
-    <StyleContent @updateLabelGroups="updateLabelGroups"/>
+    <StyleContent
+      @updateLabelGroups="updateLabelGroups"
+      @applyDefaultStyle="applyDefaultStyle"
+    />
     <OptionsContent/>
     <CustomizeContent/>
     <AboutContent/>
@@ -105,9 +108,8 @@ export default {
     })
   },
   methods: {
-    updateLabelGroups() {
-      this.$emit('updateLabelGroups')
-    }
+    updateLabelGroups() { this.$emit('updateLabelGroups') },
+    applyDefaultStyle() { this.$emit('applyDefaultStyle') },
   }
 }
 </script>
