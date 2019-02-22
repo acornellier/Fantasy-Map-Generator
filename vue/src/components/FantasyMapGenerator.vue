@@ -45,6 +45,7 @@ import * as PriorityQueue from 'js-priority-queue'
 import * as $ from 'jquery'
 import 'jquery-ui-bundle'
 import 'jquery-ui-bundle/jquery-ui.css'
+import {toHEX, rand, rn, round, si, getInteger, GFontToDataURI, ifDefined} from './utils'
 import Dialogs from './dialogs/Dialogs.vue'
 import Graphic from './Graphic.vue'
 import Options from './options/Options.vue'
@@ -72,6 +73,175 @@ export default {
 
 'use strict'
 
+// consants
+const ICONS = [
+  // emoticons in FF:
+  ['2693', '⚓', 'Anchor'],
+  ['26EA', '⛪', 'Church'],
+  ['1F3EF', '🏯', 'Japanese Castle'],
+  ['1F3F0', '🏰', 'Castle'],
+  ['1F5FC', '🗼', 'Tower'],
+  ['1F3E0', '🏠', 'House'],
+  ['1F3AA', '🎪', 'Tent'],
+  ['1F3E8', '🏨', 'Hotel'],
+  ['1F4B0', '💰', 'Money bag'],
+  ['1F4A8', '💨', 'Dashing away'],
+  ['1F334', '🌴', 'Palm'],
+  ['1F335', '🌵', 'Cactus'],
+  ['1F33E', '🌾', 'Sheaf'],
+  ['1F5FB', '🗻', 'Mountain'],
+  ['1F30B', '🌋', 'Volcano'],
+  ['1F40E', '🐎', 'Horse'],
+  ['1F434', '🐴', 'Horse Face'],
+  ['1F42E', '🐮', 'Cow'],
+  ['1F43A', '🐺', 'Wolf Face'],
+  ['1F435', '🐵', 'Monkey face'],
+  ['1F437', '🐷', 'Pig face'],
+  ['1F414', '🐔', 'Chiken'],
+  ['1F411', '🐑', 'Eve'],
+  ['1F42B', '🐫', 'Camel'],
+  ['1F418', '🐘', 'Elephant'],
+  ['1F422', '🐢', 'Turtle'],
+  ['1F40C', '🐌', 'Snail'],
+  ['1F40D', '🐍', 'Snake'],
+  ['1F433', '🐳', 'Whale'],
+  ['1F42C', '🐬', 'Dolphin'],
+  ['1F420', '🐟', 'Fish'],
+  ['1F432', '🐲', 'Dragon Head'],
+  ['1F479', '👹', 'Ogre'],
+  ['1F47B', '👻', 'Ghost'],
+  ['1F47E', '👾', 'Alien'],
+  ['1F480', '💀', 'Skull'],
+  ['1F374', '🍴', 'Fork and knife'],
+  ['1F372', '🍲', 'Food'],
+  ['1F35E', '🍞', 'Bread'],
+  ['1F357', '🍗', 'Poultry leg'],
+  ['1F347', '🍇', 'Grapes'],
+  ['1F34F', '🍏', 'Apple'],
+  ['1F352', '🍒', 'Cherries'],
+  ['1F36F', '🍯', 'Honey pot'],
+  ['1F37A', '🍺', 'Beer'],
+  ['1F377', '🍷', 'Wine glass'],
+  ['1F3BB', '🎻', 'Violin'],
+  ['1F3B8', '🎸', 'Guitar'],
+  ['26A1', '⚡', 'Electricity'],
+  ['1F320', '🌠', 'Shooting star'],
+  ['1F319', '🌙', 'Crescent moon'],
+  ['1F525', '🔥', 'Fire'],
+  ['1F4A7', '💧', 'Droplet'],
+  ['1F30A', '🌊', 'Wave'],
+  ['231B', '⌛', 'Hourglass'],
+  ['1F3C6', '🏆', 'Goblet'],
+  ['26F2', '⛲', 'Fountain'],
+  ['26F5', '⛵', 'Sailboat'],
+  ['26FA', '⛺', 'Tend'],
+  ['1F489', '💉', 'Syringe'],
+  ['1F4D6', '📚', 'Books'],
+  ['1F3AF', '🎯', 'Archery'],
+  ['1F52E', '🔮', 'Magic ball'],
+  ['1F3AD', '🎭', 'Performing arts'],
+  ['1F3A8', '🎨', 'Artist palette'],
+  ['1F457', '👗', 'Dress'],
+  ['1F451', '👑', 'Crown'],
+  ['1F48D', '💍', 'Ring'],
+  ['1F48E', '💎', 'Gem'],
+  ['1F514', '🔔', 'Bell'],
+  ['1F3B2', '🎲', 'Die'],
+  // black and white icons in FF:
+  ['26A0', '⚠', 'Alert'],
+  ['2317', '⌗', 'Hash'],
+  ['2318', '⌘', 'POI'],
+  ['2307', '⌇', 'Wavy'],
+  ['21E6', '⇦', 'Left arrow'],
+  ['21E7', '⇧', 'Top arrow'],
+  ['21E8', '⇨', 'Right arrow'],
+  ['21E9', '⇩', 'Left arrow'],
+  ['21F6', '⇶', 'Three arrows'],
+  ['2699', '⚙', 'Gear'],
+  ['269B', '⚛', 'Atom'],
+  ['0024', '$', 'Dollar'],
+  ['2680', '⚀', 'Die1'],
+  ['2681', '⚁', 'Die2'],
+  ['2682', '⚂', 'Die3'],
+  ['2683', '⚃', 'Die4'],
+  ['2684', '⚄', 'Die5'],
+  ['2685', '⚅', 'Die6'],
+  ['26B4', '⚴', 'Pallas'],
+  ['26B5', '⚵', 'Juno'],
+  ['26B6', '⚶', 'Vesta'],
+  ['26B7', '⚷', 'Chiron'],
+  ['26B8', '⚸', 'Lilith'],
+  ['263F', '☿', 'Mercury'],
+  ['2640', '♀', 'Venus'],
+  ['2641', '♁', 'Earth'],
+  ['2642', '♂', 'Mars'],
+  ['2643', '♃', 'Jupiter'],
+  ['2644', '♄', 'Saturn'],
+  ['2645', '♅', 'Uranus'],
+  ['2646', '♆', 'Neptune'],
+  ['2647', '♇', 'Pluto'],
+  ['26B3', '⚳', 'Ceres'],
+  ['2654', '♔', 'Chess king'],
+  ['2655', '♕', 'Chess queen'],
+  ['2656', '♖', 'Chess rook'],
+  ['2657', '♗', 'Chess bishop'],
+  ['2658', '♘', 'Chess knight'],
+  ['2659', '♙', 'Chess pawn'],
+  ['2660', '♠', 'Spade'],
+  ['2663', '♣', 'Club'],
+  ['2665', '♥', 'Heart'],
+  ['2666', '♦', 'Diamond'],
+  ['2698', '⚘', 'Flower'],
+  ['2625', '☥', 'Ankh'],
+  ['2626', '☦', 'Orthodox'],
+  ['2627', '☧', 'Chi Rho'],
+  ['2628', '☨', 'Lorraine'],
+  ['2629', '☩', 'Jerusalem'],
+  ['2670', '♰', 'Syriac cross'],
+  ['2020', '†', 'Dagger'],
+  ['262A', '☪', 'Muslim'],
+  ['262D', '☭', 'Soviet'],
+  ['262E', '☮', 'Peace'],
+  ['262F', '☯', 'Yin yang'],
+  ['26A4', '⚤', 'Heterosexuality'],
+  ['26A2', '⚢', 'Female homosexuality'],
+  ['26A3', '⚣', 'Male homosexuality'],
+  ['26A5', '⚥', 'Male and female'],
+  ['26AD', '⚭', 'Rings'],
+  ['2690', '⚐', 'White flag'],
+  ['2691', '⚑', 'Black flag'],
+  ['263C', '☼', 'Sun'],
+  ['263E', '☾', 'Moon'],
+  ['2668', '♨', 'Hot springs'],
+  ['2600', '☀', 'Black sun'],
+  ['2601', '☁', 'Cloud'],
+  ['2602', '☂', 'Umbrella'],
+  ['2603', '☃', 'Snowman'],
+  ['2604', '☄', 'Comet'],
+  ['2605', '★', 'Black star'],
+  ['2606', '☆', 'White star'],
+  ['269D', '⚝', 'Outlined star'],
+  ['2618', '☘', 'Shamrock'],
+  ['21AF', '↯', 'Lightning'],
+  ['269C', '⚜', 'FleurDeLis'],
+  ['2622', '☢', 'Radiation'],
+  ['2623', '☣', 'Biohazard'],
+  ['2620', '☠', 'Skull'],
+  ['2638', '☸', 'Dharma'],
+  ['2624', '☤', 'Caduceus'],
+  ['2695', '⚕', 'Aeculapius staff'],
+  ['269A', '⚚', 'Hermes staff'],
+  ['2697', '⚗', 'Alembic'],
+  ['266B', '♫', 'Music'],
+  ['2702', '✂', 'Scissors'],
+  ['2696', '⚖', 'Scales'],
+  ['2692', '⚒', 'Hammer and pick'],
+  ['2694', '⚔', 'Swords']
+]
+const FONTS = ['Almendra+SC', 'Georgia', 'Times+New+Roman', 'Comic+Sans+MS', 'Lucida+Sans+Unicode', 'Courier+New']
+const VOWELS = 'aeiouy'
+
+// global variables
 let svg
 let defs
 let viewbox
@@ -108,81 +278,31 @@ let voronoi
 let diagram
 let polygons
 let spacing
-let points
+let points = []
 let heights
-let modules
-let customization
-let history
-let historyStage
+let modules = []
+let customization = 0
+let history = []
+let historyStage = 0
 let elSelected
-let autoResize
+let autoResize = true
 let graphSize
-let cells
-let land
-let riversData
-let manors
-let states
-let features
-let notes
-let queue
-let defaultCultures
-let cultures
-let chain
-let nameBases
-let nameBase
+let cells = []
+let land = []
+let riversData = []
+let manors = []
+let states = []
+let features = []
+let notes = []
+let queue = []
+let defaultCultures = []
+let cultures = []
+let chain = []
+let nameBases = []
+let nameBase = []
 let cultureTree
 
-// convert RGB color string to HEX without #
-function toHEX(rgb) {
-  if (rgb.charAt(0) === '#') {return rgb}
-  rgb = rgb.match(/^rgba?[\s+]?\([\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?/i)
-  return (rgb && rgb.length === 4) ? '#' +
-                                     ('0' + parseInt(rgb[1], 10).toString(16)).slice(-2) +
-                                     ('0' + parseInt(rgb[2], 10).toString(16)).slice(-2) +
-                                     ('0' + parseInt(rgb[3], 10).toString(16)).slice(-2) : ''
-}
-
-// random number in a range
-function rand(min, max) {
-  if (min === undefined && !max === undefined) return Math.random()
-  if (max === undefined) {
-    max = min
-    min = 0
-  }
-  return Math.floor(Math.random() * (max - min + 1)) + min
-}
-
-// round value to d decimals
-function rn(v, d) {
-  var d = d || 0
-  const m = Math.pow(10, d)
-  return Math.round(v * m) / m
-}
-
-// round string to d decimals
-function round(s, d) {
-  var d = d || 1
-  return s.replace(/[\d\.-][\d\.e-]*/g, function(n) {return rn(n, d)})
-}
-
-// corvent number to short string with SI postfix
-function si(n) {
-  if (n >= 1e9) {return rn(n / 1e9, 1) + 'B'}
-  if (n >= 1e8) {return rn(n / 1e6) + 'M'}
-  if (n >= 1e6) {return rn(n / 1e6, 1) + 'M'}
-  if (n >= 1e4) {return rn(n / 1e3) + 'K'}
-  if (n >= 1e3) {return rn(n / 1e3, 1) + 'K'}
-  return rn(n)
-}
-
-// getInteger number from user input data
-function getInteger(value) {
-  const metric = value.slice(-1)
-  if (metric === 'K') {return parseInt(value.slice(0, -1) * 1e3)}
-  if (metric === 'M') {return parseInt(value.slice(0, -1) * 1e6)}
-  if (metric === 'B') {return parseInt(value.slice(0, -1) * 1e9)}
-  return parseInt(value)
-}
+// global methods
 
 // downalod map as SVG or PNG file
 function saveAsImage(type) {
@@ -306,61 +426,6 @@ function saveAsImage(type) {
     console.timeEnd('saveAsImage')
     window.setTimeout(function() {window.URL.revokeObjectURL(url)}, 5000)
   })
-}
-
-// Code from Kaiido's answer:
-// https://stackoverflow.com/questions/42402584/how-to-use-google-fonts-in-canvas-when-drawing-dom-objects-in-svg
-function GFontToDataURI(url) {
-  return fetch(url) // first fecth the embed stylesheet page
-    .then(resp => resp.text()) // we only need the text of it
-    .then(text => {
-      let s = document.createElement('style')
-      s.innerHTML = text
-      document.head.appendChild(s)
-      let styleSheet = Array.prototype.filter.call(
-        document.styleSheets,
-        sS => sS.ownerNode === s)[0]
-      let FontRule = rule => {
-        let src = rule.style.getPropertyValue('src')
-        let family = rule.style.getPropertyValue('font-family')
-        let url = src.split('url(')[1].split(')')[0]
-        return {
-          rule: rule,
-          src: src,
-          url: url.substring(url.length - 1, 1)
-        }
-      }
-      let fontRules = [], fontProms = []
-
-      for (let r of styleSheet.cssRules) {
-        let fR = FontRule(r)
-        fontRules.push(fR)
-        fontProms.push(
-          fetch(fR.url) // fetch the actual font-file (.woff)
-            .then(resp => resp.blob())
-            .then(blob => {
-              return new Promise(resolve => {
-                let f = new FileReader()
-                f.onload = e => resolve(f.result)
-                f.readAsDataURL(blob)
-              })
-            })
-            .then(dataURL => {
-              return fR.rule.cssText.replace(fR.url, dataURL)
-            })
-        )
-      }
-      document.head.removeChild(s) // clean up
-      return Promise.all(fontProms) // wait for all this has been done
-    })
-}
-
-// return value (v) if defined with specified number of decimals (d)
-// else return "no" or attribute (r)
-function ifDefined(v, r, d) {
-  if (v === null || v === undefined) return r || 'no'
-  if (d) return v.toFixed(d)
-  return v
 }
 
 // get user-friendly (real-world) height value from map data
@@ -635,32 +700,6 @@ function fantasyMap() {
   // append ocean pattern
   oceanPattern.append('rect').attr('fill', 'url(#oceanic)').attr('stroke', 'none')
   oceanLayers.append('rect').attr('id', 'oceanBase')
-
-  // main data variables
-  points = []
-  // Common variables
-  modules = {}
-  customization = 0
-  history = []
-  historyStage = 0
-  autoResize = true
-  cells = []
-  land = []
-  riversData = []
-  manors = []
-  states = []
-  features = []
-  notes = []
-  queue = []
-  const fonts = ['Almendra+SC', 'Georgia', 'Times+New+Roman', 'Comic+Sans+MS', 'Lucida+Sans+Unicode', 'Courier+New']
-
-  // Cultures-related data
-  defaultCultures = []
-  cultures = []
-  chain = {}
-  nameBases = []
-  nameBase = []
-  const vowels = 'aeiouy'
 
   // canvas element for raster images
   const canvas = document.getElementById('canvas')
@@ -2625,7 +2664,7 @@ function fantasyMap() {
     let group = d3.select(this.parentNode)
     updateGroupOptions()
     labelGroupSelect.value = group.attr('id')
-    labelFontSelect.value = fonts.indexOf(group.attr('data-font'))
+    labelFontSelect.value = FONTS.indexOf(group.attr('data-font'))
     labelSize.value = group.attr('data-size')
     labelColor.value = toHEX(group.attr('fill'))
     labelOpacity.value = group.attr('opacity')
@@ -2796,9 +2835,9 @@ function fantasyMap() {
     // on label font change
     document.getElementById('labelFontSelect').addEventListener('change', function() {
       let group = elSelected.node().parentNode
-      let font = fonts[this.value].split(':')[0].replace(/\+/g, ' ')
+      let font = FONTS[this.value].split(':')[0].replace(/\+/g, ' ')
       group.setAttribute('font-family', font)
-      group.setAttribute('data-font', fonts[this.value])
+      group.setAttribute('data-font', FONTS[this.value])
     })
 
     // on adding custom font
@@ -2807,7 +2846,7 @@ function fantasyMap() {
         if (!fetched) return
         labelExternalFont.click()
         labelFontInput.value = ''
-        if (fetched === 1) $('#labelFontSelect').val(fonts.length - 1).change()
+        if (fetched === 1) $('#labelFontSelect').val(FONTS.length - 1).change()
       })
     })
 
@@ -3795,7 +3834,7 @@ function fantasyMap() {
     burgNameInput.value = manors[id].name
     updateBurgsGroupOptions()
     burgSelectGroup.value = labelGroup.attr('id')
-    burgSelectDefaultFont.value = fonts.indexOf(labelGroup.attr('data-font'))
+    burgSelectDefaultFont.value = FONTS.indexOf(labelGroup.attr('data-font'))
     burgSetLabelSize.value = labelGroup.attr('data-size')
     burgLabelColorInput.value = toHEX(labelGroup.attr('fill'))
     burgLabelOpacity.value =
@@ -3991,8 +4030,8 @@ function fantasyMap() {
       const type = elSelected.node().parentNode.id
       const group = burgLabels.select('#' + type)
       if (burgSelectDefaultFont.value === '') return
-      const font = fonts[burgSelectDefaultFont.value].split(':')[0].replace(/\+/g, ' ')
-      group.attr('font-family', font).attr('data-font', fonts[burgSelectDefaultFont.value])
+      const font = FONTS[burgSelectDefaultFont.value].split(':')[0].replace(/\+/g, ' ')
+      group.attr('font-family', font).attr('data-font', FONTS[burgSelectDefaultFont.value])
     })
 
     $('#burgInputExternalFont').change(function() {
@@ -4000,7 +4039,7 @@ function fantasyMap() {
         if (!fetched) return
         burgToggleExternalFont.click()
         burgInputExternalFont.value = ''
-        if (fetched === 1) $('#burgSelectDefaultFont').val(fonts.length - 1).change()
+        if (fetched === 1) $('#burgSelectDefaultFont').val(FONTS.length - 1).change()
       })
     })
 
@@ -4379,182 +4418,17 @@ function fantasyMap() {
     })
 
     function drawIconsList() {
-      let icons = [
-        // emoticons in FF:
-        ['2693', '⚓', 'Anchor'],
-        ['26EA', '⛪', 'Church'],
-        ['1F3EF', '🏯', 'Japanese Castle'],
-        ['1F3F0', '🏰', 'Castle'],
-        ['1F5FC', '🗼', 'Tower'],
-        ['1F3E0', '🏠', 'House'],
-        ['1F3AA', '🎪', 'Tent'],
-        ['1F3E8', '🏨', 'Hotel'],
-        ['1F4B0', '💰', 'Money bag'],
-        ['1F4A8', '💨', 'Dashing away'],
-        ['1F334', '🌴', 'Palm'],
-        ['1F335', '🌵', 'Cactus'],
-        ['1F33E', '🌾', 'Sheaf'],
-        ['1F5FB', '🗻', 'Mountain'],
-        ['1F30B', '🌋', 'Volcano'],
-        ['1F40E', '🐎', 'Horse'],
-        ['1F434', '🐴', 'Horse Face'],
-        ['1F42E', '🐮', 'Cow'],
-        ['1F43A', '🐺', 'Wolf Face'],
-        ['1F435', '🐵', 'Monkey face'],
-        ['1F437', '🐷', 'Pig face'],
-        ['1F414', '🐔', 'Chiken'],
-        ['1F411', '🐑', 'Eve'],
-        ['1F42B', '🐫', 'Camel'],
-        ['1F418', '🐘', 'Elephant'],
-        ['1F422', '🐢', 'Turtle'],
-        ['1F40C', '🐌', 'Snail'],
-        ['1F40D', '🐍', 'Snake'],
-        ['1F433', '🐳', 'Whale'],
-        ['1F42C', '🐬', 'Dolphin'],
-        ['1F420', '🐟', 'Fish'],
-        ['1F432', '🐲', 'Dragon Head'],
-        ['1F479', '👹', 'Ogre'],
-        ['1F47B', '👻', 'Ghost'],
-        ['1F47E', '👾', 'Alien'],
-        ['1F480', '💀', 'Skull'],
-        ['1F374', '🍴', 'Fork and knife'],
-        ['1F372', '🍲', 'Food'],
-        ['1F35E', '🍞', 'Bread'],
-        ['1F357', '🍗', 'Poultry leg'],
-        ['1F347', '🍇', 'Grapes'],
-        ['1F34F', '🍏', 'Apple'],
-        ['1F352', '🍒', 'Cherries'],
-        ['1F36F', '🍯', 'Honey pot'],
-        ['1F37A', '🍺', 'Beer'],
-        ['1F377', '🍷', 'Wine glass'],
-        ['1F3BB', '🎻', 'Violin'],
-        ['1F3B8', '🎸', 'Guitar'],
-        ['26A1', '⚡', 'Electricity'],
-        ['1F320', '🌠', 'Shooting star'],
-        ['1F319', '🌙', 'Crescent moon'],
-        ['1F525', '🔥', 'Fire'],
-        ['1F4A7', '💧', 'Droplet'],
-        ['1F30A', '🌊', 'Wave'],
-        ['231B', '⌛', 'Hourglass'],
-        ['1F3C6', '🏆', 'Goblet'],
-        ['26F2', '⛲', 'Fountain'],
-        ['26F5', '⛵', 'Sailboat'],
-        ['26FA', '⛺', 'Tend'],
-        ['1F489', '💉', 'Syringe'],
-        ['1F4D6', '📚', 'Books'],
-        ['1F3AF', '🎯', 'Archery'],
-        ['1F52E', '🔮', 'Magic ball'],
-        ['1F3AD', '🎭', 'Performing arts'],
-        ['1F3A8', '🎨', 'Artist palette'],
-        ['1F457', '👗', 'Dress'],
-        ['1F451', '👑', 'Crown'],
-        ['1F48D', '💍', 'Ring'],
-        ['1F48E', '💎', 'Gem'],
-        ['1F514', '🔔', 'Bell'],
-        ['1F3B2', '🎲', 'Die'],
-        // black and white icons in FF:
-        ['26A0', '⚠', 'Alert'],
-        ['2317', '⌗', 'Hash'],
-        ['2318', '⌘', 'POI'],
-        ['2307', '⌇', 'Wavy'],
-        ['21E6', '⇦', 'Left arrow'],
-        ['21E7', '⇧', 'Top arrow'],
-        ['21E8', '⇨', 'Right arrow'],
-        ['21E9', '⇩', 'Left arrow'],
-        ['21F6', '⇶', 'Three arrows'],
-        ['2699', '⚙', 'Gear'],
-        ['269B', '⚛', 'Atom'],
-        ['0024', '$', 'Dollar'],
-        ['2680', '⚀', 'Die1'],
-        ['2681', '⚁', 'Die2'],
-        ['2682', '⚂', 'Die3'],
-        ['2683', '⚃', 'Die4'],
-        ['2684', '⚄', 'Die5'],
-        ['2685', '⚅', 'Die6'],
-        ['26B4', '⚴', 'Pallas'],
-        ['26B5', '⚵', 'Juno'],
-        ['26B6', '⚶', 'Vesta'],
-        ['26B7', '⚷', 'Chiron'],
-        ['26B8', '⚸', 'Lilith'],
-        ['263F', '☿', 'Mercury'],
-        ['2640', '♀', 'Venus'],
-        ['2641', '♁', 'Earth'],
-        ['2642', '♂', 'Mars'],
-        ['2643', '♃', 'Jupiter'],
-        ['2644', '♄', 'Saturn'],
-        ['2645', '♅', 'Uranus'],
-        ['2646', '♆', 'Neptune'],
-        ['2647', '♇', 'Pluto'],
-        ['26B3', '⚳', 'Ceres'],
-        ['2654', '♔', 'Chess king'],
-        ['2655', '♕', 'Chess queen'],
-        ['2656', '♖', 'Chess rook'],
-        ['2657', '♗', 'Chess bishop'],
-        ['2658', '♘', 'Chess knight'],
-        ['2659', '♙', 'Chess pawn'],
-        ['2660', '♠', 'Spade'],
-        ['2663', '♣', 'Club'],
-        ['2665', '♥', 'Heart'],
-        ['2666', '♦', 'Diamond'],
-        ['2698', '⚘', 'Flower'],
-        ['2625', '☥', 'Ankh'],
-        ['2626', '☦', 'Orthodox'],
-        ['2627', '☧', 'Chi Rho'],
-        ['2628', '☨', 'Lorraine'],
-        ['2629', '☩', 'Jerusalem'],
-        ['2670', '♰', 'Syriac cross'],
-        ['2020', '†', 'Dagger'],
-        ['262A', '☪', 'Muslim'],
-        ['262D', '☭', 'Soviet'],
-        ['262E', '☮', 'Peace'],
-        ['262F', '☯', 'Yin yang'],
-        ['26A4', '⚤', 'Heterosexuality'],
-        ['26A2', '⚢', 'Female homosexuality'],
-        ['26A3', '⚣', 'Male homosexuality'],
-        ['26A5', '⚥', 'Male and female'],
-        ['26AD', '⚭', 'Rings'],
-        ['2690', '⚐', 'White flag'],
-        ['2691', '⚑', 'Black flag'],
-        ['263C', '☼', 'Sun'],
-        ['263E', '☾', 'Moon'],
-        ['2668', '♨', 'Hot springs'],
-        ['2600', '☀', 'Black sun'],
-        ['2601', '☁', 'Cloud'],
-        ['2602', '☂', 'Umbrella'],
-        ['2603', '☃', 'Snowman'],
-        ['2604', '☄', 'Comet'],
-        ['2605', '★', 'Black star'],
-        ['2606', '☆', 'White star'],
-        ['269D', '⚝', 'Outlined star'],
-        ['2618', '☘', 'Shamrock'],
-        ['21AF', '↯', 'Lightning'],
-        ['269C', '⚜', 'FleurDeLis'],
-        ['2622', '☢', 'Radiation'],
-        ['2623', '☣', 'Biohazard'],
-        ['2620', '☠', 'Skull'],
-        ['2638', '☸', 'Dharma'],
-        ['2624', '☤', 'Caduceus'],
-        ['2695', '⚕', 'Aeculapius staff'],
-        ['269A', '⚚', 'Hermes staff'],
-        ['2697', '⚗', 'Alembic'],
-        ['266B', '♫', 'Music'],
-        ['2702', '✂', 'Scissors'],
-        ['2696', '⚖', 'Scales'],
-        ['2692', '⚒', 'Hammer and pick'],
-        ['2694', '⚔', 'Swords']
-      ]
-
       let table = document.getElementById('markerIconTable'), row = ''
       table.addEventListener('click', clickMarkerIconTable, false)
       table.addEventListener('mouseover', hoverMarkerIconTable, false)
 
-      for (let i = 0; i < icons.length; i++) {
+      for (let i = 0; i < ICONS.length; i++) {
         if (i % 20 === 0) row = table.insertRow(0)
         let cell = row.insertCell(0)
-        let icon = String.fromCodePoint(parseInt(icons[i][0], 16))
+        let icon = String.fromCodePoint(parseInt(ICONS[i][0], 16))
         cell.innerHTML = icon
         cell.id = 'markerIcon' + icon.codePointAt()
-        cell.setAttribute('data-desc', icons[i][2])
+        cell.setAttribute('data-desc', ICONS[i][2])
       }
     }
 
@@ -5481,13 +5355,13 @@ function fantasyMap() {
           if (d[c] === undefined) break
           str += d[c]
           if (str === ' ') break
-          if (d[c] !== 'o' && d[c] !== 'e' && vowels.includes(d[c]) && d[c + 1] === d[c]) break
+          if (d[c] !== 'o' && d[c] !== 'e' && VOWELS.includes(d[c]) && d[c + 1] === d[c]) break
           if (d[c + 2] === ' ') {
             str += d[c + 1]
             break
           }
-          if (vowels.includes(d[c])) vowel++
-          if (vowel && vowels.includes(d[c + 2])) break
+          if (VOWELS.includes(d[c])) vowel++
+          if (vowel && VOWELS.includes(d[c + 2])) break
         }
       }
       if (i >= 0) {
@@ -5863,7 +5737,7 @@ function fantasyMap() {
       addSuffix = true
     } else if (base === 12) {
       // Japanese ends on vowels
-      if (vowels.includes(name.slice(-1))) return name
+      if (VOWELS.includes(name.slice(-1))) return name
       return name + 'u'
     } else if (base === 10) {
       // Korean has "guk" suffix
@@ -5880,10 +5754,10 @@ function fantasyMap() {
     }
 
     // define if suffix should be used
-    let vowel = vowels.includes(name.slice(-1)) // last char is vowel
+    let vowel = VOWELS.includes(name.slice(-1)) // last char is vowel
     if (vowel && name.length > 3) {
       if (Math.random() < 0.85) {
-        if (vowels.includes(name.slice(-2, -1))) {
+        if (VOWELS.includes(name.slice(-2, -1))) {
           name = name.slice(0, -2)
           addSuffix = true // 85% for vv
         } else if (Math.random() < 0.7) {
@@ -6824,7 +6698,7 @@ function fantasyMap() {
                           'Nova+Script', 'Uncial+Antiqua', 'Underdog', 'Caesar+Dressing', 'Bitter', 'Yellowtail', 'Montez',
                           'Shadows+Into+Light', 'Fredericka+the+Great', 'Orbitron', 'Dancing+Script:700',
                           'Architects+Daughter', 'Kaushan+Script', 'Gloria+Hallelujah', 'Satisfy', 'Comfortaa:700', 'Cinzel']
-      fontsToAdd.forEach(function(f) {if (fonts.indexOf(f) === -1) fonts.push(f)})
+      fontsToAdd.forEach(function(f) {if (FONTS.indexOf(f) === -1) FONTS.push(f)})
       updateFontOptions()
     }
   }
@@ -6851,7 +6725,7 @@ function fantasyMap() {
         }
         updateFontOptions()
         if (fetched === 1) {
-          tip('Font ' + fonts[fonts.length - 1] + ' is fetched')
+          tip('Font ' + FONTS[FONTS.length - 1] + ' is fetched')
         } else if (fetched > 1) {
           tip(fetched + ' fonts are added to the list')
         }
@@ -6876,8 +6750,8 @@ function fantasyMap() {
           let font = family.replace(/['"]+/g, '').replace(/ /g, '+')
           let weight = rule.style.getPropertyValue('font-weight')
           if (weight !== '400') font += ':' + weight
-          if (fonts.indexOf(font) == -1) {
-            fonts.push(font)
+          if (FONTS.indexOf(font) == -1) {
+            FONTS.push(font)
             fetched++
           }
         }
@@ -6892,10 +6766,10 @@ function fantasyMap() {
   // Update font list for Label and Burg Editors
   function updateFontOptions() {
     labelFontSelect.innerHTML = ''
-    for (let i = 0; i < fonts.length; i++) {
+    for (let i = 0; i < FONTS.length; i++) {
       const opt = document.createElement('option')
       opt.value = i
-      const font = fonts[i].split(':')[0].replace(/\+/g, ' ')
+      const font = FONTS[i].split(':')[0].replace(/\+/g, ' ')
       opt.style.fontFamily = opt.innerHTML = font
       labelFontSelect.add(opt)
     }
@@ -7296,7 +7170,7 @@ function fantasyMap() {
       const el = d3.select(this)
       if (el.attr('id') === 'burgLabels') return
       const font = el.attr('data-font')
-      if (font && fonts.indexOf(font) === -1) addFonts(
+      if (font && FONTS.indexOf(font) === -1) addFonts(
         'https://fonts.googleapis.com/css?family=' + font)
       if (!el.attr('data-size')) el.attr('data-size', +el.attr('font-size'))
       if (el.style('display') === 'none') el.node().style.display = null
