@@ -20,7 +20,8 @@
     "priorityqueue": "^0.2.1",
     "quantize": "^1.0.2",
     "seedrandom": "^2.4.4",
-    "vue": "^2.5.17"
+    "vue": "^2.5.17",
+    "vuex": "^3.1.0"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.4.0",

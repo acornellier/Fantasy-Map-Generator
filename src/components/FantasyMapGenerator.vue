@@ -6857,7 +6857,8 @@ function fantasyMap() {
     graphWidth = nWidth
     graphHeight = nHeight
     voronoi = d3.voronoi().extent([[-1, -1], [graphWidth + 1, graphHeight + 1]])
-    zoom.translateExtent([[0, 0], [graphWidth, graphHeight]]).scaleExtent([1, 20])
+    zoom.translateExtent([[0, 0], [graphWidth, graphHeight]])
+        .scaleExtent([1, 20])
         .scaleTo(svg, 1)
     viewbox.attr('transform', null)
 
@@ -6882,7 +6883,8 @@ function fantasyMap() {
             const yShift = (nHeight * scaleTo - svgHeight) / 2 / scaleTo
             svg.select('#ocean').selectAll('rect').attr('x', xShift).attr('y', yShift)
                .attr('width', extent).attr('height', extent)
-            zoom.translateExtent([[0, 0], [nWidth, nHeight]]).scaleExtent([scaleTo, 20])
+            zoom.translateExtent([[0, 0], [nWidth, nHeight]])
+                .scaleExtent([scaleTo, 20])
                 .scaleTo(svg, scaleTo)
             $(this).dialog('close')
           },
@@ -9730,7 +9732,8 @@ function fantasyMap() {
     svg.attr('width', svgWidth).attr('height', svgHeight)
     // set extent to map borders + 100px to get infinity world reception
     voronoi = d3.voronoi().extent([[-1, -1], [graphWidth + 1, graphHeight + 1]])
-    zoom.translateExtent([[0, 0], [graphWidth, graphHeight]]).scaleExtent([1, 20])
+    zoom.translateExtent([[0, 0], [graphWidth, graphHeight]])
+        .scaleExtent([1, 20])
         .scaleTo(svg, 1)
     viewbox.attr('transform', null)
     ocean.selectAll('rect').attr('x', 0).attr('y', 0).attr('width', graphWidth)
