@@ -159,11 +159,8 @@
 </template>
 
 <script>
-import * as $ from 'jquery'
-import * as d3 from 'd3'
+import {svg, viewbox} from '../utils'
 
-const svg = () => d3.select('svg')
-const viewbox = () => svg().select('#viewbox')
 const selectedValue = () => document.getElementById('styleElementSelect').value
 const selectedElement = () => svg().select('#' + selectedValue())
 

@@ -46,7 +46,8 @@ import * as PriorityQueue from 'js-priority-queue'
 import * as $ from 'jquery'
 import 'jquery-ui-bundle'
 import 'jquery-ui-bundle/jquery-ui.css'
-import {toHEX, rand, rn, round, si, getInteger, GFontToDataURI, ifDefined} from './utils'
+import * as _ from 'lodash'
+import {toHEX, round, si, getInteger, GFontToDataURI, ifDefined} from './utils'
 import Dialogs from './dialogs/Dialogs.vue'
 import Graphic from './Graphic.vue'
 import Options from './options/Options.vue'
@@ -333,7 +334,7 @@ function saveAsImage(type) {
       if (!el.size()) return
       const bbox = el.select('rect').node().getBBox()
       const tr = [graphWidth - bbox.width, graphHeight - (bbox.height - 10)]
-      el.attr('transform', 'translate(' + rn(tr[0]) + ',' + rn(tr[1]) + ')')
+      el.attr('transform', 'translate(' + Math.round(tr[0]) + ',' + Math.round(tr[1]) + ')')
     }
 
     // to fix use elements sizing
@@ -363,7 +364,7 @@ function saveAsImage(type) {
   // show hidden labels but in reduced size
   clone.select('#labels').selectAll('.hidden').each(function(e) {
     const size = d3.select(this).attr('font-size')
-    d3.select(this).classed('hidden', false).attr('font-size', rn(size * 0.4, 2))
+    d3.select(this).classed('hidden', false).attr('font-size', _.round(size * 0.4, 2))
   })
 
   // save group css to style attribute
@@ -437,7 +438,7 @@ function getFriendlyHeight(h) {
   let height = -990
   if (h >= 20) height = Math.pow(h - 18, exponent)
   if (h < 20 && h > 0) height = (h - 20) / h * 50
-  return h + ' (' + rn(height * unitRatio) + ' ' + unit + ')'
+  return h + ' (' + Math.round(height * unitRatio) + ' ' + unit + ')'
 }
 
 // Get cell info on mouse move (useful for debugging)
@@ -448,8 +449,8 @@ function moved() {
   // update cellInfo
   if (i) {
     const p = cells[i] // get cell
-    infoX.innerHTML = rn(point[0])
-    infoY.innerHTML = rn(point[1])
+    infoX.innerHTML = Math.round(point[0])
+    infoY.innerHTML = Math.round(point[1])
     infoCell.innerHTML = i
     infoArea.innerHTML = ifDefined(p.area, 'n/a', 2)
     if (customization === 1) {
@@ -548,7 +549,7 @@ function moved() {
     else if (customization === 4) radius = culturesManuallyBrush.value
     else if (customization === 5) radius = reliefBulkRemoveRadius.value
 
-    const r = rn(6 / graphSize * radius, 1)
+    const r = _.round(6 / graphSize * radius, 1)
     let clr = '#373737'
     if (customization === 2) {
       const state = +$('div.selected').attr('id').slice(5)
@@ -621,7 +622,7 @@ function applyDefaultStyle() {
   styleOceanLayers.checked = true
 
   labels.attr('opacity', 1).attr('stroke', '#3a3a3a').attr('stroke-width', 0)
-  let size = rn(8 - regionsInput.value / 20)
+  let size = Math.round(8 - regionsInput.value / 20)
   if (size < 3) size = 3
   burgLabels.select('#capitals').attr('fill', '#3e3e4b').attr('opacity', 1)
             .attr('font-family', 'Almendra SC').attr('data-font', 'Almendra+SC')
@@ -635,7 +636,7 @@ function applyDefaultStyle() {
   burgIcons.select('#towns').attr('size', .5).attr('stroke-width', .12).attr('fill', '#ffffff')
            .attr('stroke', '#3e3e4b').attr('fill-opacity', .7).attr('stroke-opacity', 1)
            .attr('opacity', 1)
-  size = rn(16 - regionsInput.value / 6)
+  size = Math.round(16 - regionsInput.value / 6)
   if (size < 6) size = 6
   labels.select('#countries').attr('fill', '#3e3e4b').attr('opacity', 1)
         .attr('font-family', 'Almendra SC').attr('data-font', 'Almendra+SC')
@@ -803,7 +804,7 @@ function fantasyMap() {
       const el = d3.select(this)
       if (el.attr('id') === 'burgLabels') return
       const desired = +el.attr('data-size')
-      let relative = rn((desired + desired / scale) / 2, 2)
+      let relative = _.round((desired + desired / scale) / 2, 2)
       if (relative < 2) relative = 2
       el.attr('font-size', relative)
       if ($('#hideLabels').checked) {
@@ -825,7 +826,7 @@ function fantasyMap() {
     if (ruler.size()) {
       if (ruler.style('display') !== 'none') {
         if (ruler.selectAll('g').size() < 1) {return}
-        const factor = rn(1 / Math.pow(scale, 0.3), 1)
+        const factor = _.round(1 / Math.pow(scale, 0.3), 1)
         ruler.selectAll('circle:not(.center)').attr('r', 2 * factor)
              .attr('stroke-width', 0.5 * factor)
         ruler.selectAll('circle.center').attr('r', 1.2 * factor)
@@ -1067,24 +1068,24 @@ function fantasyMap() {
 
   // randomize options if randomization is allowed in option
   function randomizeOptions() {
-    const mod = rn((graphWidth + graphHeight) / 1500, 2) // add mod for big screens
+    const mod = _.round((graphWidth + graphHeight) / 1500, 2) // add mod for big screens
     if (lockRegionsInput.getAttribute('data-locked') == 0) regionsInput.value =
-      regionsOutput.value = rand(7, 17)
+      regionsOutput.value = _.random(7, 17)
     if (lockManorsInput.getAttribute('data-locked') == 0) {
-      const manors = regionsInput.value * 20 + rand(180 * mod)
+      const manors = regionsInput.value * 20 + _.random(180 * mod)
       manorsInput.value = manorsOutput.innerHTML = manors
     }
     if (lockPowerInput.getAttribute('data-locked') == 0) powerInput.value =
-      powerOutput.value = rand(2, 8)
+      powerOutput.value = _.random(2, 8)
     if (lockNeutralInput.getAttribute('data-locked') == 0) neutralInput.value =
-      neutralOutput.value = rand(100, 300)
-    if (lockNamesInput.getAttribute('data-locked') == 0) namesInput.value = rand(0, 1)
+      neutralOutput.value = _.random(100, 300)
+    if (lockNamesInput.getAttribute('data-locked') == 0) namesInput.value = _.random(0, 1)
     if (lockCulturesInput.getAttribute('data-locked') == 0) culturesInput.value =
-      culturesOutput.value = rand(5, 10)
+      culturesOutput.value = _.random(5, 10)
     if (lockPrecInput.getAttribute('data-locked') == 0) precInput.value =
-      precOutput.value = rand(3, 12)
+      precOutput.value = _.random(3, 12)
     if (lockSwampinessInput.getAttribute('data-locked') == 0) swampinessInput.value =
-      swampinessOutput.value = rand(100)
+      swampinessOutput.value = _.random(100)
   }
 
   // Locate points to calculate Voronoi diagram
@@ -1102,10 +1103,10 @@ function fantasyMap() {
     diagram = voronoi(points)
     // round edges to simplify future calculations
     diagram.edges.forEach(function(e) {
-      e[0][0] = rn(e[0][0], 2)
-      e[0][1] = rn(e[0][1], 2)
-      e[1][0] = rn(e[1][0], 2)
-      e[1][1] = rn(e[1][1], 2)
+      e[0][0] = _.round(e[0][0], 2)
+      e[0][1] = _.round(e[0][1], 2)
+      e[1][0] = _.round(e[1][0], 2)
+      e[1][1] = _.round(e[1][1], 2)
     })
     polygons = diagram.polygons()
     console.log(' cells: ' + points.length)
@@ -1624,7 +1625,7 @@ function fantasyMap() {
     if (outlineLayersInput.value === 'none') return
     if (outlineLayersInput.value !== 'random') limits = outlineLayersInput.value.split(',')
     // Define area edges
-    const opacity = rn(0.4 / limits.length, 2)
+    const opacity = _.round(0.4 / limits.length, 2)
     for (let l = 0; l < limits.length; l++) {
       const edges = []
       const lim = +limits[l]
@@ -1669,7 +1670,7 @@ function fantasyMap() {
       const pit = i.pit
       const ctype = i.ctype
       if (ctype !== -1 && ctype !== -2 && height < 20) return // exclude all deep ocean points
-      const x = rn(i.data[0], 1), y = rn(i.data[1], 1)
+      const x = _.round(i.data[0], 1), y = _.round(i.data[1], 1)
       const fn = i.fn
       const harbor = i.harbor
       let lake = i.lake
@@ -1704,7 +1705,7 @@ function fantasyMap() {
           if (cells[e].ctype === ctype) {
             let x1 = (x * 2 + cells[e].data[0]) / 3
             let y1 = (y * 2 + cells[e].data[1]) / 3
-            x1 = rn(x1, 1), y1 = rn(y1, 1)
+            x1 = _.round(x1, 1), y1 = _.round(y1, 1)
             copy = $.grep(newPoints, function(e) {return e[0] === x1 && e[1] === y1})
             if (copy.length) return
             newPoints.push([x1, y1])
@@ -1727,9 +1728,9 @@ function fantasyMap() {
         polygons[i.index].forEach(function(e) {
           if (Math.random() > 0.8) return
           let rnd = Math.random() * 0.6 + 0.8
-          const x1 = rn((e[0] * rnd + i.data[0]) / (1 + rnd), 2)
+          const x1 = _.round((e[0] * rnd + i.data[0]) / (1 + rnd), 2)
           rnd = Math.random() * 0.6 + 0.8
-          const y1 = rn((e[1] * rnd + i.data[1]) / (1 + rnd), 2)
+          const y1 = _.round((e[1] * rnd + i.data[1]) / (1 + rnd), 2)
           copy = $.grep(newPoints, function(c) {return x1 === c[0] && y1 === c[1]})
           if (copy.length) return
           newPoints.push([x1, y1])
@@ -1745,8 +1746,8 @@ function fantasyMap() {
     cells.map(function(i, d) {
       if (i.height >= 20) {
         // calc cell area
-        i.area = rn(Math.abs(d3.polygonArea(polygons[d])), 2)
-        const prec = rn(avPrec * i.area, 2)
+        i.area = _.round(Math.abs(d3.polygonArea(polygons[d])), 2)
+        const prec = _.round(avPrec * i.area, 2)
         i.flux = i.lake ? prec * 10 : prec
       }
       const neighbors = [] // re-detect neighbors
@@ -1840,7 +1841,7 @@ function fantasyMap() {
     undo.disabled = templateUndo.disabled = historyStage <= 1
     redo.disabled = templateRedo.disabled = true
     const landMean = Math.trunc(d3.mean(heights))
-    const landRatio = rn(landCells / heights.length * 100)
+    const landRatio = _.round(landCells / heights.length * 100)
     landmassCounter.innerHTML = landCells
     landmassRatio.innerHTML = landRatio
     landmassAverage.innerHTML = landMean
@@ -1900,10 +1901,10 @@ function fantasyMap() {
               const x = (land[i].data[0] + cells[ea].data[0]) / 2
               const y = (land[i].data[1] + cells[ea].data[1]) / 2
               land[i].haven = ea // harbor haven (oposite water cell)
-              land[i].coastX = rn(x + (land[i].data[0] - x) * 0.1, 1)
-              land[i].coastY = rn(y + (land[i].data[1] - y) * 0.1, 1)
-              land[i].data[0] = rn(x + (land[i].data[0] - x) * 0.5, 1)
-              land[i].data[1] = rn(y + (land[i].data[1] - y) * 0.5, 1)
+              land[i].coastX = _.round(x + (land[i].data[0] - x) * 0.1, 1)
+              land[i].coastY = _.round(y + (land[i].data[1] - y) * 0.1, 1)
+              land[i].data[0] = _.round(x + (land[i].data[0] - x) * 0.5, 1)
+              land[i].data[1] = _.round(y + (land[i].data[1] - y) * 0.5, 1)
             }
             if (features[cells[ea].fn].border) {
               oceanEdges[f].push({start, end})
@@ -1980,36 +1981,36 @@ function fantasyMap() {
                         .call(d3.drag().on('start', elementDrag))
     const init = 100 // actual length in pixels if scale, dScale and size = 1;
     let val = init * size * dScale / scale // bar length in distance unit
-    if (val > 900) {val = rn(val, -3)} // round to 1000
-    else if (val > 90) {val = rn(val, -2)} // round to 100
-    else if (val > 9) {val = rn(val, -1)} // round to 10
-    else {val = rn(val)} // round to 1
+    if (val > 900) {val = _.round(val, -3)} // round to 1000
+    else if (val > 90) {val = _.round(val, -2)} // round to 100
+    else if (val > 9) {val = _.round(val, -1)} // round to 10
+    else {val = Math.round(val)} // round to 1
     const l = val * scale / dScale // actual length in pixels on this scale
     const x = 0, y = 0 // initial position
     scaleBar.append('line').attr('x1', x + 0.5).attr('y1', y).attr('x2', x + l + size - 0.5)
             .attr('y2', y).attr('stroke-width', size).attr('stroke', 'white')
     scaleBar.append('line').attr('x1', x).attr('y1', y + size).attr('x2', x + l + size)
             .attr('y2', y + size).attr('stroke-width', size).attr('stroke', '#3d3d3d')
-    const dash = size + ' ' + rn(l / 5 - size, 2)
+    const dash = size + ' ' + _.round(l / 5 - size, 2)
     scaleBar.append('line').attr('x1', x).attr('y1', y).attr('x2', x + l + size).attr('y2', y)
-            .attr('stroke-width', rn(size * 3, 2)).attr('stroke-dasharray', dash)
+            .attr('stroke-width', _.round(size * 3, 2)).attr('stroke-dasharray', dash)
             .attr('stroke', '#3d3d3d')
     // big scale
     for (let b = 0; b < 6; b++) {
-      const value = rn(b * l / 5, 2)
-      const label = rn(value * dScale / scale)
+      const value = _.round(b * l / 5, 2)
+      const label = _.round(value * dScale / scale)
       if (b === 5) {
         scaleBar.append('text').attr('x', x + value).attr('y', y - 2 * size)
-                .attr('font-size', rn(5 * size, 1)).text(label + ' ' + unit)
+                .attr('font-size', _.round(5 * size, 1)).text(label + ' ' + unit)
       } else {
         scaleBar.append('text').attr('x', x + value).attr('y', y - 2 * size)
-                .attr('font-size', rn(5 * size, 1)).text(label)
+                .attr('font-size', _.round(5 * size, 1)).text(label)
       }
     }
     if (barLabel.value !== '') {
       scaleBar.append('text').attr('x', x + (l + 1) / 2).attr('y', y + 2 * size)
               .attr('dominant-baseline', 'text-before-edge')
-              .attr('font-size', rn(5 * size, 1)).text(barLabel.value)
+              .attr('font-size', _.round(5 * size, 1)).text(barLabel.value)
     }
     const bbox = scaleBar.node().getBBox()
     // append backbround rectangle
@@ -2026,8 +2027,8 @@ function fantasyMap() {
                           .call(d3.drag().on('start', elementDrag))
     if (!minXedge) minXedge = [0, 0]
     if (!maxXedge) maxXedge = [svgWidth, svgHeight]
-    const x1 = rn(minXedge[0], 2), y1 = rn(minXedge[1], 2), x2 = rn(maxXedge[0], 2),
-      y2 = rn(maxXedge[1], 2)
+    const x1 = _.round(minXedge[0], 2), y1 = _.round(minXedge[1], 2), x2 = _.round(maxXedge[0], 2),
+      y2 = _.round(maxXedge[1], 2)
     rulerNew.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
             .attr('class', 'white')
     rulerNew.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
@@ -2036,14 +2037,15 @@ function fantasyMap() {
             .attr('data-edge', 'left').call(d3.drag().on('drag', rulerEdgeDrag))
     rulerNew.append('circle').attr('r', 2).attr('cx', x2).attr('cy', y2).attr('stroke-width', 0.5)
             .attr('data-edge', 'rigth').call(d3.drag().on('drag', rulerEdgeDrag))
-    const x0 = rn((x1 + x2) / 2, 2), y0 = rn((y1 + y2) / 2, 2)
+    const x0 = _.round((x1 + x2) / 2, 2)
+    const y0 = _.round((y1 + y2) / 2, 2)
     rulerNew.append('circle').attr('r', 1.2).attr('cx', x0).attr('cy', y0)
             .attr('stroke-width', 0.3).attr('class', 'center')
             .call(d3.drag().on('start', rulerCenterDrag))
     const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI
     const tr = 'rotate(' + angle + ' ' + x0 + ' ' + y0 + ')'
-    const dist = rn(Math.hypot(x1 - x2, y1 - y2))
-    const label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
+    const dist = Math.round(Math.hypot(x1 - x2, y1 - y2))
+    const label = Math.round(dist * distanceScale.value) + ' ' + distanceUnit.value
     rulerNew.append('text').attr('x', x0).attr('y', y0).attr('dy', -1).attr('transform', tr)
             .attr('data-dist', dist).text(label).on('click', removeParent).attr('font-size', 10)
   }
@@ -2093,17 +2095,20 @@ function fantasyMap() {
     const line = group.selectAll('line')
     if (edge === 'left') {
       line.attr('x1', x).attr('y1', y)
-      x0 = +line.attr('x2'), y0 = +line.attr('y2')
+      x0 = +line.attr('x2')
+      y0 = +line.attr('y2')
     } else {
       line.attr('x2', x).attr('y2', y)
-      x0 = +line.attr('x1'), y0 = +line.attr('y1')
+      x0 = +line.attr('x1')
+      y0 = +line.attr('y1')
     }
-    const xc = rn((x + x0) / 2, 2), yc = rn((y + y0) / 2, 2)
+    const xc = _.round((x + x0) / 2, 2)
+    const yc = _.round((y + y0) / 2, 2)
     group.select('.center').attr('cx', xc).attr('cy', yc)
-    const dist = rn(Math.hypot(x0 - x, y0 - y))
-    const label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
+    const dist = Math.round(Math.hypot(x0 - x, y0 - y))
+    const label = Math.round(dist * distanceScale.value) + ' ' + distanceUnit.value
     const atan = x0 > x ? Math.atan2(y0 - y, x0 - x) : Math.atan2(y - y0, x - x0)
-    const angle = rn(atan * 180 / Math.PI, 3)
+    const angle = _.round(atan * 180 / Math.PI, 3)
     const tr = 'rotate(' + angle + ' ' + xc + ' ' + yc + ')'
     group.select('text').attr('x', xc).attr('y', yc).attr('transform', tr).attr('data-dist', dist)
          .text(label)
@@ -2119,7 +2124,7 @@ function fantasyMap() {
       y2 = +line.attr('y2') // initial line edge points
     const rulerNew = ruler.insert('g', ':first-child')
     rulerNew.attr('transform', group.attr('transform')).call(d3.drag().on('start', elementDrag))
-    const factor = rn(1 / Math.pow(scale, 0.3), 1)
+    const factor = _.round(1 / Math.pow(scale, 0.3), 1)
     rulerNew.append('line').attr('class', 'white').attr('stroke-width', factor)
     const dash = +group.select('.gray').attr('stroke-dasharray')
     rulerNew.append('line').attr('class', 'gray').attr('stroke-dasharray', dash)
@@ -2132,19 +2137,21 @@ function fantasyMap() {
       d3.select(this).attr('cx', x).attr('cy', y)
       // change first part
       line.attr('x1', x1).attr('y1', y1).attr('x2', x).attr('y2', y)
-      let dist = rn(Math.hypot(x1 - x, y1 - y))
-      let label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
+      let dist = Math.round(Math.hypot(x1 - x, y1 - y))
+      let label = Math.round(dist * distanceScale.value) + ' ' + distanceUnit.value
       let atan = x1 > x ? Math.atan2(y1 - y, x1 - x) : Math.atan2(y - y1, x - x1)
-      xc1 = rn((x + x1) / 2, 2), yc1 = rn((y + y1) / 2, 2)
-      let tr = 'rotate(' + rn(atan * 180 / Math.PI, 3) + ' ' + xc1 + ' ' + yc1 + ')'
+      xc1 = _.round((x + x1) / 2, 2)
+      yc1 = _.round((y + y1) / 2, 2)
+      let tr = 'rotate(' + _.round(atan * 180 / Math.PI, 3) + ' ' + xc1 + ' ' + yc1 + ')'
       group.select('text').attr('x', xc1).attr('y', yc1).attr('transform', tr)
            .attr('data-dist', dist).text(label)
       // change second (new) part
-      dist = rn(Math.hypot(x2 - x, y2 - y))
-      label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
+      dist = Math.round(Math.hypot(x2 - x, y2 - y))
+      label = Math.round(dist * distanceScale.value) + ' ' + distanceUnit.value
       atan = x2 > x ? Math.atan2(y2 - y, x2 - x) : Math.atan2(y - y2, x - x2)
-      xc2 = rn((x + x2) / 2, 2), yc2 = rn((y + y2) / 2, 2)
-      tr = 'rotate(' + rn(atan * 180 / Math.PI, 3) + ' ' + xc2 + ' ' + yc2 + ')'
+      xc2 = _.round((x + x2) / 2, 2)
+      yc2 = _.round((y + y2) / 2, 2)
+      tr = 'rotate(' + _.round(atan * 180 / Math.PI, 3) + ' ' + xc2 + ' ' + yc2 + ')'
       rulerNew.selectAll('line').attr('x1', x).attr('y1', y).attr('x2', x2).attr('y2', y2)
       rulerNew.select('text').attr('x', xc2).attr('y', yc2).attr('transform', tr)
               .attr('data-dist', dist).text(label)
@@ -2195,19 +2202,19 @@ function fantasyMap() {
       const d = round(lineGen(points))
       curve.attr('d', d)
       curveGray.attr('d', d)
-      const dist = rn(curve.node().getTotalLength())
-      const label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
+      const dist = Math.round(curve.node().getTotalLength())
+      const label = Math.round(dist * distanceScale.value) + ' ' + distanceUnit.value
       text.attr('x', x).attr('y', y).text(label)
     })
 
     d3.event.on('end', function() {
-      const dist = rn(curve.node().getTotalLength())
+      const dist = Math.round(curve.node().getTotalLength())
       const c = curve.node().getPointAtLength(dist / 2)
       const p = curve.node().getPointAtLength((dist / 2) - 1)
-      const label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
+      const label = Math.round(dist * distanceScale.value) + ' ' + distanceUnit.value
       const atan = p.x > c.x ? Math.atan2(p.y - c.y, p.x - c.x) :
                    Math.atan2(c.y - p.y, c.x - p.x)
-      const angle = rn(atan * 180 / Math.PI, 3)
+      const angle = Math.round(atan * 180 / Math.PI, 3)
       const tr = 'rotate(' + angle + ' ' + c.x + ' ' + c.y + ')'
       text.attr('data-points', JSON.stringify(points)).attr('data-dist', dist).attr('x', c.x)
           .attr('y', c.y).attr('transform', tr).text(label)
@@ -2458,8 +2465,8 @@ function fantasyMap() {
       })
       if (dataRiver.length > 1) {
         const riverAmended = amendRiver(dataRiver, 1)
-        const width = rn(0.8 + Math.random() * 0.4, 1)
-        const increment = rn(0.8 + Math.random() * 0.4, 1)
+        const width = _.round(0.8 + Math.random() * 0.4, 1)
+        const increment = _.round(0.8 + Math.random() * 0.4, 1)
         const d = drawRiver(riverAmended, width, increment)
         rivers.append('path').attr('d', d).attr('id', 'river' + i).attr('data-width', width)
               .attr('data-increment', increment)
@@ -2527,7 +2534,7 @@ function fantasyMap() {
       if (i === 0) {return 0}
       riverLength += Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1])
     })
-    const widening = rn((1000 + (riverLength * 30)) * increment)
+    const widening = Math.round((1000 + (riverLength * 30)) * increment)
     const riverPointsLeft = [], riverPointsRight = []
     const last = points.length - 1
     const factor = riverLength / points.length
@@ -2581,7 +2588,7 @@ function fantasyMap() {
     })
     const river = defs.append('path').attr('d', lineGen(riverPoints))
     const riverLength = river.node().getTotalLength()
-    const widening = rn((1000 + (riverLength * 30)) * increment)
+    const widening = Math.round((1000 + (riverLength * 30)) * increment)
     const riverPointsLeft = [], riverPointsRight = []
 
     for (let l = 0; l < riverLength; l++) {
@@ -2883,7 +2890,7 @@ function fantasyMap() {
       let group = elSelected.node().parentNode
       let size = +this.value
       group.setAttribute('data-size', size)
-      group.setAttribute('font-size', rn((size + (size / scale)) / 2, 2))
+      group.setAttribute('font-size', _.round((size + (size / scale)) / 2, 2))
     })
 
     $('#labelStyleButton').click(function() {
@@ -3316,7 +3323,7 @@ function fantasyMap() {
           Remove: function() {
             $(this).dialog('close')
             const river = +elSelected.attr('id').slice(5)
-            const avPrec = rn(precInput.value / Math.sqrt(cells.length), 2)
+            const avPrec = _.round(precInput.value / Math.sqrt(cells.length), 2)
             land.map(function(l) {
               if (l.river === river) {
                 l.river = undefined
@@ -3414,7 +3421,7 @@ function fantasyMap() {
         addRoutePoint(p)
       }
       // convert length to distance
-      routeLength.innerHTML = rn(l * distanceScale.value) + ' ' + distanceUnit.value
+      routeLength.innerHTML = Math.round(l * distanceScale.value) + ' ' + distanceUnit.value
     }
 
     function addRoutePoint(point) {
@@ -3449,7 +3456,7 @@ function fantasyMap() {
       elSelected.attr('d', lineGen(points))
       // get route distance
       const l = elSelected.node().getTotalLength()
-      routeLength.innerHTML = rn(l * distanceScale.value) + ' ' + distanceUnit.value
+      routeLength.innerHTML = Math.round(l * distanceScale.value) + ' ' + distanceUnit.value
     }
 
     function addNewRoute() {
@@ -3472,7 +3479,7 @@ function fantasyMap() {
 
     function newRouteAddPoint() {
       const point = d3.mouse(this)
-      const x = rn(point[0], 2), y = rn(point[1], 2)
+      const x = _.round(point[0], 2), y = _.round(point[1], 2)
       addRoutePoint({x, y})
       routeRedraw()
     }
@@ -3630,10 +3637,10 @@ function fantasyMap() {
       copy.removeAttribute('data-id') // remove assignment to burg if any
       const tr = parseTransform(copy.getAttribute('transform'))
       const shift = 10 / Math.sqrt(scale)
-      let transform = 'translate(' + rn(tr[0] - shift, 1) + ',' + rn(tr[1] - shift, 1) + ')'
+      let transform = 'translate(' + _.round(tr[0] - shift, 1) + ',' + _.round(tr[1] - shift, 1) + ')'
       for (let i = 2; group.selectAll("[transform='" + transform + "']").size() > 0; i++) {
         transform =
-          'translate(' + rn(tr[0] - shift * i, 1) + ',' + rn(tr[1] - shift * i, 1) + ')'
+          'translate(' + _.round(tr[0] - shift * i, 1) + ',' + _.round(tr[1] - shift * i, 1) + ')'
       }
       copy.setAttribute('transform', transform)
       group.node().insertBefore(copy, null)
@@ -3758,10 +3765,10 @@ function fantasyMap() {
       const copy = elSelected.node().cloneNode(true)
       const tr = parseTransform(copy.getAttribute('transform'))
       const shift = 10 / Math.sqrt(scale)
-      let transform = 'translate(' + rn(tr[0] - shift, 1) + ',' + rn(tr[1] - shift, 1) + ')'
+      let transform = 'translate(' + _.round(tr[0] - shift, 1) + ',' + _.round(tr[1] - shift, 1) + ')'
       for (let i = 2; group.selectAll("[transform='" + transform + "']").size() > 0; i++) {
         transform =
-          'translate(' + rn(tr[0] - shift * i, 1) + ',' + rn(tr[1] - shift * i, 1) + ')'
+          'translate(' + _.round(tr[0] - shift * i, 1) + ',' + _.round(tr[1] - shift * i, 1) + ')'
       }
       copy.setAttribute('transform', transform)
       group.node().insertBefore(copy, null)
@@ -3815,7 +3822,7 @@ function fantasyMap() {
       let point = d3.mouse(this)
       let cell = diagram.find(point[0], point[1]).index
       let radius = +reliefBulkRemoveRadius.value
-      let r = rn(6 / graphSize * radius, 1)
+      let r = Math.round(6 / graphSize * radius, 1)
       moveCircle(point[0], point[1], r)
       let selection = defineBrushSelection(cell, radius)
       if (selection) removeReliefIcons(selection)
@@ -3891,7 +3898,7 @@ function fantasyMap() {
     d3.select('#burgTogglePort').classed('pressed', cell.port !== undefined)
     burgPopulation.value = manors[id].population
     burgPopulationFriendly.value =
-      rn(manors[id].population * urbanization.value * populationRate.value * 1000)
+      Math.round(manors[id].population * urbanization.value * populationRate.value * 1000)
 
     $('#burgEditor').dialog({
       title: 'Edit Burg: ' + manors[id].name,
@@ -4167,8 +4174,8 @@ function fantasyMap() {
         const ag = type === 'capitals' ? '#capital-anchors' : '#town-anchors'
         const group = icons.select(ag)
         const size = +group.attr('size')
-        const x = rn(manors[id].x - size * 0.47, 2)
-        const y = rn(manors[id].y - size * 0.47, 2)
+        const x = _.round(manors[id].x - size * 0.47, 2)
+        const y = _.round(manors[id].y - size * 0.47, 2)
         group.append('use').attr('xlink:href', '#icon-anchor').attr('data-id', id)
              .attr('x', x).attr('y', y).attr('width', size).attr('height', size)
              .on('click', editIcon)
@@ -4180,7 +4187,7 @@ function fantasyMap() {
     $('#burgPopulation').on('input', function() {
       const id = +elSelected.attr('data-id')
       burgPopulationFriendly.value =
-        rn(this.value * urbanization.value * populationRate.value * 1000)
+        Math.round(this.value * urbanization.value * populationRate.value * 1000)
       manors[id].population = +this.value
     })
 
@@ -4246,7 +4253,7 @@ function fantasyMap() {
         }
       }
 
-      const x = rn(point[0], 2), y = rn(point[1], 2)
+      const x = _.round(point[0], 2), y = _.round(point[1], 2)
       burgIcons.select('circle[data-id=\'' + i + '\']').attr('transform', null).attr('cx', x)
                .attr('cy', y)
       burgLabels.select('text[data-id=\'' + i + '\']').attr('transform', null).attr('x', x)
@@ -4254,8 +4261,8 @@ function fantasyMap() {
       const anchor = icons.select('use[data-id=\'' + i + '\']')
       if (anchor.size()) {
         const size = anchor.attr('width')
-        const xa = rn(x - size * 0.47, 2)
-        const ya = rn(y - size * 0.47, 2)
+        const xa = _.round(x - size * 0.47, 2)
+        const ya = _.round(y - size * 0.47, 2)
         anchor.attr('transform', null).attr('x', xa).attr('y', ya)
       }
       cells[index].manor = i
@@ -4268,7 +4275,7 @@ function fantasyMap() {
       const id = +elSelected.attr('data-id')
       const name = manors[id].name
       const cell = manors[id].cell
-      const pop = rn(manors[id].population)
+      const pop = Math.round(manors[id].population)
       const size = pop > 65 ? 65 : pop < 6 ? 6 : pop
       const s = seed + '' + id
       const hub = cells[cell].crossroad > 2 ? 1 : 0
@@ -4627,8 +4634,8 @@ function fantasyMap() {
       const to = g === 'towns' ? $('#town-anchors') : $('#capital-anchors')
       el.detach().appendTo(to)
       const useSize = to.attr('size')
-      const x = rn(manors[id].x - useSize * 0.47, 2)
-      const y = rn(manors[id].y - useSize * 0.47, 2)
+      const x = _.round(manors[id].x - useSize * 0.47, 2)
+      const y = _.round(manors[id].y - useSize * 0.47, 2)
       el.attr('x', x).attr('y', y).attr('width', useSize).attr('height', useSize)
     }
     updateCountryEditors()
@@ -4674,7 +4681,7 @@ function fantasyMap() {
     console.time('rankPlacesGeography')
     land.map(function(c) {
       let score = 0
-      c.flux = rn(c.flux, 2)
+      c.flux = _.round(c.flux, 2)
       // get base score from height (will be biom)
       if (c.height <= 40) score = 2
       else if (c.height <= 50) score = 1.8
@@ -4696,7 +4703,7 @@ function fantasyMap() {
         const difEv = c.height - d3.mean(neighbEv)
         // if (!isNaN(difEv)) score += difEv * 10 * (1 - c.height / 100); // local height maximums are valued
       }
-      c.score = rn(Math.random() * score + score, 3) // add random factor
+      c.score = _.round(Math.random() * score + score, 3) // add random factor
     })
     land.sort(function(a, b) {return b.score - a.score})
     console.timeEnd('rankPlacesGeography')
@@ -4713,7 +4720,7 @@ function fantasyMap() {
         const crossroad = c.crossroad || 0 // crossroads are valued
         score = score + path + crossroad
       }
-      c.score = rn(Math.random() * score + score, 2) // add random factor
+      c.score = _.round(Math.random() * score + score, 2) // add random factor
     })
     land.sort(function(a, b) {return b.score - a.score})
     console.timeEnd('rankPlacesEconomy')
@@ -4728,7 +4735,7 @@ function fantasyMap() {
     manors.map(function(m) {
       const cell = cells[m.cell]
       let score = cell.score
-      if (score <= 0) {score = rn(Math.random(), 2)}
+      if (score <= 0) {score = _.round(Math.random(), 2)}
       if (cell.crossroad) {score += cell.crossroad} // crossroads
       if (cell.confluence) {score += Math.pow(cell.confluence, 0.3)} // confluences
       if (m.i !== m.region && cell.port) {score *= 1.5} // ports (not capital)
@@ -4736,7 +4743,7 @@ function fantasyMap() {
       if (m.i === m.region && cell.port) {score *= 3} // port-capitals
       if (m.region === 'neutral') score *= urbanFactor
       const rnd = 0.6 + Math.random() * 0.8 // random factor
-      m.population = rn(score * rnd, 1)
+      m.population = _.round(score * rnd, 1)
     })
 
     // calculate rural population for each cell based on area + elevation (elevation to be changed to biome)
@@ -4746,7 +4753,7 @@ function fantasyMap() {
       const elevationFactor = Math.pow(1 - l.height / 100, 3)
       population = elevationFactor * l.area * graphSizeAdj
       if (l.region === 'neutral') population *= ruralFactor
-      l.pop = rn(population, 1)
+      l.pop = _.round(population, 1)
     })
 
     // calculate population for each region
@@ -4759,14 +4766,14 @@ function fantasyMap() {
       // define region total and burgs population
       let burgsPop = 0 // get summ of all burgs population
       burgs.map(function(b) {burgsPop += b.population})
-      s.urbanPopulation = rn(burgsPop, 2)
+      s.urbanPopulation = _.round(burgsPop, 2)
       const regionCells = $.grep(cells, function(e) {
         return e.region === i
       })
       let cellsPop = 0
       regionCells.map(function(c) {cellsPop += c.pop})
       s.cells = regionCells.length
-      s.ruralPopulation = rn(cellsPop, 1)
+      s.ruralPopulation = _.round(cellsPop, 1)
     })
 
     // collect data for neutrals
@@ -4784,8 +4791,8 @@ function fantasyMap() {
       })
       states.push({
         i: states.length, color: 'neutral', name: 'Neutrals', capital: 'neutral',
-        cells: neutralCells.length, burgs, urbanPopulation: rn(urbanPopulation, 2),
-        ruralPopulation: rn(ruralPopulation, 2), area: rn(area)
+        cells: neutralCells.length, burgs, urbanPopulation: _.round(urbanPopulation, 2),
+        ruralPopulation: _.round(ruralPopulation, 2), area: Math.round(area)
       })
     }
   }
@@ -4823,7 +4830,7 @@ function fantasyMap() {
     const scheme = count <= 8 ? colors8 : colors20
     const mod = +powerInput.value
     manors.forEach(function(m, i) {
-      const power = rn(Math.random() * mod / 2 + 1, 1)
+      const power = _.round(Math.random() * mod / 2 + 1, 1)
       const color = scheme(i / count)
       states.push({i, color, power, capital: i})
       const p = cells[m.cell]
@@ -4897,9 +4904,9 @@ function fantasyMap() {
         if (shift < 0.2) shift = 0.2
         if (shift > 1) shift = 1
         shift = Math.random() > .5 ? shift : shift * -1
-        x = rn(x + shift, 2)
+        x = _.round(x + shift, 2)
         shift = Math.random() > .5 ? shift : shift * -1
-        y = rn(y + shift, 2)
+        y = _.round(y + shift, 2)
       }
       cell.data[0] = manors[i].x = x
       cell.data[1] = manors[i].y = y
@@ -5011,7 +5018,7 @@ function fantasyMap() {
       })
       const l = manorsOnIsland.length
       if (l > 1) {
-        const secondary = rn((l + 8) / 10)
+        const secondary = Math.round((l + 8) / 10)
         for (let s = 0; s < secondary; s++) {
           var start = manorsOnIsland[Math.floor(Math.random() * l)].index
           var end = manorsOnIsland[Math.floor(Math.random() * l)].index
@@ -5070,8 +5077,8 @@ function fantasyMap() {
       // draw anchor icon
       const group = m < states.length ? cAnchors : tAnchors
       const size = m < states.length ? cSize : tSize
-      const x = rn(cells[cell].data[0] - size * 0.47, 2)
-      const y = rn(cells[cell].data[1] - size * 0.47, 2)
+      const x = _.round(cells[cell].data[0] - size * 0.47, 2)
+      const y = _.round(cells[cell].data[1] - size * 0.47, 2)
       group.append('use').attr('xlink:href', '#icon-anchor').attr('data-id', m)
            .attr('x', x).attr('y', y).attr('width', size).attr('height', size)
       icons.selectAll('use').on('click', editIcon)
@@ -5406,23 +5413,20 @@ function fantasyMap() {
   function generateName(culture, base) {
     if (base === undefined) {
       if (!cultures[culture]) {
-        console.error(
-          'culture ' + culture + ' is not defined. Will load default cultures and set first culture')
+        console.error('culture ' + culture + ' is not defined. Will load default cultures and set first culture')
         generateCultures()
         culture = 0
       }
       base = cultures[culture].base
     }
     if (!nameBases[base]) {
-      console.error(
-        'nameBase ' + base + ' is not defined. Will load default names data and first base')
+      console.error('nameBase ' + base + ' is not defined. Will load default names data and first base')
       if (!nameBases[0]) applyDefaultNamesData()
       base = 0
     }
     const method = nameBases[base].method
     const error = function(base) {
-      tip(
-        'Names data for base ' + nameBases[base].name + ' is incorrect. Please fix in Namesbase Editor')
+      tip('Names data for base ' + nameBases[base].name + ' is incorrect. Please fix in Namesbase Editor')
       editNamesbase()
     }
 
@@ -5431,9 +5435,8 @@ function fantasyMap() {
         error(base)
         return
       }
-      const rnd = rand(nameBase[base].length - 1)
-      const name = nameBase[base][rnd]
-      return name
+      const rnd = _.random(nameBase[base].length - 1)
+      return nameBase[base][rnd]
     }
 
     const data = chain[base]
@@ -5449,7 +5452,7 @@ function fantasyMap() {
       error(base)
       return
     }
-    let cur = variants[rand(variants.length - 1)]
+    let cur = variants[_.random(variants.length - 1)]
     for (let i = 0; i < 21; i++) {
       if (cur === ' ' && Math.random() < 0.8) {
         // space means word end, but we don't want to end if word is too short
@@ -5468,19 +5471,19 @@ function fantasyMap() {
         error(base)
         return
       }
-      cur = variants[rand(variants.length - 1)]
+      cur = variants[_.random(variants.length - 1)]
     }
     // very rare case, let's just select a random name
-    if (word.length < 2) word = nameBase[base][rand(nameBase[base].length - 1)]
+    if (word.length < 2) word = nameBase[base][_.random(nameBase[base].length - 1)]
 
     // do not allow multi-word name if word is foo short or not allowed for culture
     if (word.includes(' ')) {
-      let words = word.split(' '), parsed
+      let words = word.split(' ')
       if (Math.random() > nameBases[base].m) {word = words.join('')} else {
         for (let i = 0; i < words.length; i++) {
           if (words[i].length < 2) {
             if (!i) words[1] = words[0] + words[1]
-            if (i) words[i - 1] = words[i - 1] + words[i]
+            if (i) words[i - 1] += words[i]
             words.splice(i, 1)
             i--
           }
@@ -5490,7 +5493,7 @@ function fantasyMap() {
     }
 
     // parse word to get a final name
-    const name = [...word].reduce(function(r, c, i, data) {
+    return [...word].reduce(function(r, c, i, data) {
       if (c === ' ') {
         if (!r.length) return ''
         if (i + 1 === data.length) return r
@@ -5503,7 +5506,6 @@ function fantasyMap() {
       }
       return r + c
     }, '')
-    return name
   }
 
   // Define areas based on the closest manor to a polygon
@@ -5660,8 +5662,8 @@ function fantasyMap() {
     const name = states[region].name
     const c = polylabel(array, 1.0) // pole of inaccessibility
     labels.select('#countries').append('text').attr('id', 'regionLabel' + region)
-          .attr('x', rn(c[0])).attr('y', rn(c[1])).text(name).on('click', editLabel)
-    states[region].area = rn(Math.abs(d3.polygonArea(array[0]))) // define region area
+          .attr('x', Math.round(c[0])).attr('y', Math.round(c[1])).text(name).on('click', editLabel)
+    states[region].area = Math.round(Math.abs(d3.polygonArea(array[0]))) // define region area
   }
 
   function drawRegionCoast(edges, region) {
@@ -5738,7 +5740,7 @@ function fantasyMap() {
     let name = 'NameIdontWant'
     if (Math.random() < 0.85 || culture === null) {
       // culture is random if capital is not yet defined
-      if (culture === null) culture = rand(cultures.length - 1)
+      if (culture === null) culture = _.random(cultures.length - 1)
       // try to avoid too long words as a basename
       for (let i = 0; i < 20 && name.length > 7; i++) {
         name = generateName(culture)
@@ -6005,7 +6007,7 @@ function fantasyMap() {
       if (c.ctype === undefined) delete c.ctype
       if (c.lake === undefined) delete c.lake
       c.height = Math.trunc(c.height)
-      if (c.height >= 20) c.flux = rn(c.flux, 2)
+      if (c.height >= 20) c.flux = _.round(c.flux, 2)
     })
     // restore layers if they was turned on
     if (!$('#toggleHeight').hasClass('buttonoff') && !terrs.selectAll('path')
@@ -6141,7 +6143,7 @@ function fantasyMap() {
           if (polygons[cell][c] === undefined) break
           const g = forests.append('g').attr('data-cell', cell)
           if (c === 0) {
-            cx = rn(p[0] - 1 - Math.random(), 1)
+            cx = _.round(p[0] - 1 - Math.random(), 1)
             cy = p[1] - 2
           } else {
             const p2 = polygons[cell][c]
@@ -6299,8 +6301,7 @@ function fantasyMap() {
 
     function addLabelOnClick() {
       const point = d3.mouse(this)
-      const index = getIndex(point)
-      const x = rn(point[0], 2), y = rn(point[1], 2)
+      const x = _.round(point[0], 2), y = _.round(point[1], 2)
 
       // get culture in clicked point to generate a name
       const closest = cultureTree.find(x, y)
@@ -6342,7 +6343,7 @@ function fantasyMap() {
     function addBurgOnClick() {
       const point = d3.mouse(this)
       const index = getIndex(point)
-      const x = rn(point[0], 2), y = rn(point[1], 2)
+      const x = _.round(point[0], 2), y = _.round(point[1], 2)
 
       // get culture in clicked point to generate a name
       let culture = cells[index].culture
@@ -6386,11 +6387,11 @@ function fantasyMap() {
       }
       cells[index].manor = i
       let score = cells[index].score
-      if (score <= 0) {score = rn(Math.random(), 2)}
+      if (score <= 0) {score = _.round(Math.random(), 2)}
       if (cells[index].crossroad) {score += cells[index].crossroad} // crossroads
       if (cells[index].confluence) {score += Math.pow(cells[index].confluence, 0.3)} // confluences
       if (cells[index].port !== undefined) {score *= 3} // port-capital
-      const population = rn(score, 1)
+      const population = _.round(score, 1)
       manors.push({i, cell: index, x, y, region, culture, name, population})
       recalculateStateData(state)
       updateCountryEditors()
@@ -6448,7 +6449,7 @@ function fantasyMap() {
               function(e) {return e.height > cells[min].height})
             if (dataRiver.length > riverCellsUpper.length) {
               // new river is more perspective
-              const avPrec = rn(precInput.value / Math.sqrt(cells.length), 2)
+              const avPrec = _.round(precInput.value / Math.sqrt(cells.length), 2)
               let dataRiverMin = []
               riverCells.map(function(c) {
                 if (c.height < cells[min].height) {
@@ -6513,7 +6514,7 @@ function fantasyMap() {
         return
       }
 
-      const x = rn(point[0], 2), y = rn(point[1], 2)
+      const x = _.round(point[0], 2), y = _.round(point[1], 2)
       const type = reliefGroup.value
       addReliefIcon(height / 100, type, x, y, index)
 
@@ -6545,7 +6546,7 @@ function fantasyMap() {
 
     function addMarkerOnClick() {
       const point = d3.mouse(this)
-      let x = rn(point[0], 2), y = rn(point[1], 2)
+      let x = _.round(point[0], 2), y = _.round(point[1], 2)
       let selected = markerSelectGroup.value
       let valid = selected && d3.select('#defs-markers').select('#' + selected).size() === 1
       let symbol = valid ? '#' + selected : '#marker0'
@@ -6585,7 +6586,7 @@ function fantasyMap() {
     s.burgs = burgs.length
     let burgsPop = 0 // get summ of all burgs population
     burgs.map(function(b) {burgsPop += b.population})
-    s.urbanPopulation = rn(burgsPop, 1)
+    s.urbanPopulation = _.round(burgsPop, 1)
     const regionCells = $.grep(cells, function(e) {return (e.region === state)})
     let cellsPop = 0, area = 0
     regionCells.map(function(c) {
@@ -6593,8 +6594,8 @@ function fantasyMap() {
       area += c.area
     })
     s.cells = regionCells.length
-    s.area = rn(area)
-    s.ruralPopulation = rn(cellsPop, 1)
+    s.area = Math.round(area)
+    s.ruralPopulation = _.round(cellsPop, 1)
   }
 
   function changeSelectedOnClick() {
@@ -6874,7 +6875,7 @@ function fantasyMap() {
             // rescale loaded map
             const xRatio = svgWidth / nWidth
             const yRatio = svgHeight / nHeight
-            const scaleTo = rn(Math.min(xRatio, yRatio), 4)
+            const scaleTo = _.round(Math.min(xRatio, yRatio), 4)
             // calculate frames to scretch ocean background
             const extent = (100 / scaleTo) + '%'
             const xShift = (nWidth * scaleTo - svgWidth) / 2 / scaleTo
@@ -7048,7 +7049,7 @@ function fantasyMap() {
         // calculate area
         if (c.area === undefined || isNaN(c.area)) {
           const area = d3.polygonArea(polygons[d])
-          c.area = rn(Math.abs(area), 2)
+          c.area = _.round(Math.abs(area), 2)
         }
         // calculate population
         if (c.pop === undefined || isNaN(c.pop)) {
@@ -7056,7 +7057,7 @@ function fantasyMap() {
           const elevationFactor = Math.pow((100 - c.height) / 100, 3)
           population = elevationFactor * c.area * graphSizeAdj
           if (c.region === 'neutral') population *= 0.5
-          c.pop = rn(population, 1)
+          c.pop = _.round(population, 1)
         }
         // if culture is undefined, set to 0
         if (c.culture === undefined || isNaN(c.culture)) c.culture = 0
@@ -7119,16 +7120,16 @@ function fantasyMap() {
 
   // get square grid with some jirrering
   function getJitteredGrid() {
-    let sizeMod = rn((graphWidth + graphHeight) / 1500, 2) // screen size modifier
-    spacing = rn(7.5 * sizeMod / graphSize, 2) // space between points before jirrering
+    let sizeMod = _.round((graphWidth + graphHeight) / 1500, 2) // screen size modifier
+    spacing = _.round(7.5 * sizeMod / graphSize, 2) // space between points before jirrering
     const radius = spacing / 2 // square radius
     const jittering = radius * 0.9 // max deviation
     const jitter = function() {return Math.random() * 2 * jittering - jittering}
     let points = []
     for (let y = radius; y < graphHeight; y += spacing) {
       for (let x = radius; x < graphWidth; x += spacing) {
-        let xj = rn(x + jitter(), 2)
-        let yj = rn(y + jitter(), 2)
+        let xj = _.round(x + jitter(), 2)
+        let yj = _.round(y + jitter(), 2)
         points.push([xj, yj])
       }
     }
@@ -7294,7 +7295,7 @@ function fantasyMap() {
       $('.statePower').each(function(e, i) {
         const state = +(this.parentNode.id).slice(5)
         if (states[state].capital === 'neutral') return
-        const power = rn(Math.random() * mod / 2 + 1, 1)
+        const power = _.round(Math.random() * mod / 2 + 1, 1)
         $(this).val(power)
         $(this).parent().attr('data-expansion', power)
         states[state].power = power
@@ -7344,10 +7345,10 @@ function fantasyMap() {
         totalArea = getInteger(totalArea.split(' ')[0])
         const totalPopulation = getInteger(countriesFooterPopulation.innerHTML)
         $('#countriesBody > .states').each(function() {
-          const cells = rn($(this).attr('data-cells') / totalCells * 100)
-          const burgs = rn($(this).attr('data-burgs') / totalBurgs * 100)
-          const area = rn($(this).attr('data-area') / totalArea * 100)
-          const population = rn($(this).attr('data-population') / totalPopulation * 100)
+          const cells = Math.round($(this).attr('data-cells') / totalCells * 100)
+          const burgs = Math.round($(this).attr('data-burgs') / totalBurgs * 100)
+          const area = Math.round($(this).attr('data-area') / totalArea * 100)
+          const population = Math.round($(this).attr('data-population') / totalPopulation * 100)
           $(this).children().filter('.stateCells').text(cells + '%')
           $(this).children().filter('.stateBurgs').text(burgs + '%')
           $(this).children().filter('.stateArea').text(area + '%')
@@ -7491,10 +7492,10 @@ function fantasyMap() {
       $('#ruler').show()
       const rulerNew = ruler.append('g').attr('class', 'linear')
                             .call(d3.drag().on('start', elementDrag))
-      const factor = rn(1 / Math.pow(scale, 0.3), 1)
+      const factor = _.round(1 / Math.pow(scale, 0.3), 1)
       const y = Math.floor(Math.random() * graphHeight * 0.5 + graphHeight * 0.25)
       const x1 = graphWidth * 0.2, x2 = graphWidth * 0.8
-      const dash = rn(30 / distanceScale.value, 2)
+      const dash = _.round(30 / distanceScale.value, 2)
       rulerNew.append('line').attr('x1', x1).attr('y1', y).attr('x2', x2).attr('y2', y)
               .attr('class', 'white').attr('stroke-width', factor)
       rulerNew.append('line').attr('x1', x1).attr('y1', y).attr('x2', x2).attr('y2', y)
@@ -7508,8 +7509,8 @@ function fantasyMap() {
       rulerNew.append('circle').attr('r', 1.2 * factor).attr('stroke-width', 0.3 * factor)
               .attr('cx', graphWidth / 2).attr('cy', y).attr('class', 'center')
               .call(d3.drag().on('start', rulerCenterDrag))
-      const dist = rn(x2 - x1)
-      const label = rn(dist * distanceScale.value) + ' ' + distanceUnit.value
+      const dist = Math.round(x2 - x1)
+      const label = Math.round(dist * distanceScale.value) + ' ' + distanceUnit.value
       rulerNew.append('text').attr('x', graphWidth / 2).attr('y', y).attr('dy', -1)
               .attr('data-dist', dist).text(label).text(label).on('click', removeParent)
               .attr('font-size', 10 * factor)
@@ -7686,9 +7687,9 @@ function fantasyMap() {
       var mod = id === 'styleFontPlus' ? 1.1 : 0.9
       el.selectAll('g').each(function() {
         const el = d3.select(this)
-        let size = rn(el.attr('data-size') * mod, 2)
+        let size = _.round(el.attr('data-size') * mod, 2)
         if (size < 2) {size = 2}
-        el.attr('data-size', size).attr('font-size', rn((size + (size / scale)) / 2, 2))
+        el.attr('data-size', size).attr('font-size', _.round((size + (size / scale)) / 2, 2))
       })
       invokeActiveZooming()
       return
@@ -8016,7 +8017,7 @@ function fantasyMap() {
     $('#colorsAssigned').fadeOut()
     const colors = [], palette = []
     points.map(function(i) {
-      let x = rn(i[0]), y = rn(i[1])
+      let x = Math.round(i[0]), y = Math.round(i[1])
       if (y == svgHeight) {y--}
       if (x == svgWidth) {x--}
       const p = (x + y * svgWidth) * 4
@@ -8121,16 +8122,16 @@ function fantasyMap() {
     $('#colorsAssigned').fadeIn()
     $('#colorsUnassigned').fadeOut()
     polygons.forEach(function(i, d) {
-      let x = rn(i.data[0]), y = rn(i.data[1])
+      let x = Math.round(i.data[0]), y = Math.round(i.data[1])
       if (y == svgHeight) y--
       if (x == svgWidth) x--
       const p = (x + y * svgWidth) * 4
       const r = data[p], g = data[p + 1], b = data[p + 2]
       const lab = d3.lab('rgb(' + r + ', ' + g + ', ' + b + ')')
       if (type === 'hue') {
-        var normalized = rn(normalize(lab.b + lab.a / 2, -50, 200), 2)
+        var normalized = _.round(normalize(lab.b + lab.a / 2, -50, 200), 2)
       } else {
-        var normalized = rn(normalize(lab.l, 0, 100), 2)
+        var normalized = _.round(normalize(lab.l, 0, 100), 2)
       }
       const rgb = color(1 - normalized)
       const hex = toHEX(rgb)
@@ -8229,11 +8230,11 @@ function fantasyMap() {
       const burgsCount = states[s].burgs
       totalBurgs += burgsCount
       // calculate user-friendly area and population
-      const area = rn(states[s].area * Math.pow(distanceScale.value, 2))
+      const area = Math.round(states[s].area * Math.pow(distanceScale.value, 2))
       totalArea += area
       areaConv = si(area) + unit
-      const urban = rn(states[s].urbanPopulation * urbanization.value * populationRate.value)
-      const rural = rn(states[s].ruralPopulation * populationRate.value)
+      const urban = Math.round(states[s].urbanPopulation * urbanization.value * populationRate.value)
+      const rural = _.round(states[s].ruralPopulation * populationRate.value)
       var population = (urban + rural) * 1000
       totalPopulation += population
       const populationConv = si(population)
@@ -8394,7 +8395,7 @@ function fantasyMap() {
     function selectCapital() {
       const point = d3.mouse(this)
       const index = getIndex(point)
-      const x = rn(point[0], 2), y = rn(point[1], 2)
+      const x = _.round(point[0], 2), y = _.round(point[1], 2)
 
       if (cells[index].height < 20) {
         tip('Cannot place capital on the water! Select a land cell')
@@ -8427,11 +8428,11 @@ function fantasyMap() {
         cells[index].manor = i
         states[state].capital = i
         let score = cells[index].score
-        if (score <= 0) {score = rn(Math.random(), 2)}
+        if (score <= 0) {score = _.round(Math.random(), 2)}
         if (cells[index].crossroad) {score += cells[index].crossroad} // crossroads
         if (cells[index].confluence) {score += Math.pow(cells[index].confluence, 0.3)} // confluences
         if (cells[index].port !== undefined) {score *= 3} // port-capital
-        const population = rn(score, 1)
+        const population = _.round(score, 1)
         manors.push({i, cell: index, x, y, region: state, culture, name, population})
         burgIcons.select('#capitals').append('circle').attr('id', 'burg' + i).attr('data-id', i)
                  .attr('cx', x).attr('cy', y).attr('r', 1).on('click', editBurg)
@@ -8465,10 +8466,10 @@ function fantasyMap() {
         return
       }
       const change = popNew / popOr
-      states[s].urbanPopulation = rn(states[s].urbanPopulation * change, 2)
-      states[s].ruralPopulation = rn(states[s].ruralPopulation * change, 2)
-      const urban = rn(states[s].urbanPopulation * urbanization.value * populationRate.value)
-      const rural = rn(states[s].ruralPopulation * populationRate.value)
+      states[s].urbanPopulation = _.round(states[s].urbanPopulation * change, 2)
+      states[s].ruralPopulation = _.round(states[s].ruralPopulation * change, 2)
+      const urban = Math.round(states[s].urbanPopulation * urbanization.value * populationRate.value)
+      const rural = Math.round(states[s].ruralPopulation * populationRate.value)
       const population = (urban + rural) * 1000
       $(this).parent().attr('data-population', population)
       this.value = si(population)
@@ -8480,7 +8481,7 @@ function fantasyMap() {
       if (states[s].capital === 'neutral') {s = 'neutral'}
       manors.map(function(m) {
         if (m.region !== s) {return}
-        m.population = rn(m.population * change, 2)
+        m.population = _.round(m.population * change, 2)
       })
     })
     // fully remove country
@@ -8551,7 +8552,7 @@ function fantasyMap() {
         '<div title="Burg culture" class="burgCulture">' + cultures[b.culture].name + '</div>')
       let population = b.population * urbanization.value * populationRate.value * 1000
       populationArray.push(population)
-      population = population > 1e4 ? si(population) : rn(population, -1)
+      population = population > 1e4 ? si(population) : _.round(population, -1)
       el.append('<span title="Population" class="icon-male"></span>')
       el.append(
         '<input title="Population. Input to change" class="burgPopulation" value="' + population + '"/>')
@@ -8587,7 +8588,7 @@ function fantasyMap() {
     // populate total line on footer
     burgsFooterBurgs.innerHTML = burgs.length
     burgsFooterCulture.innerHTML = $('#burgsBody div:first-child .burgCulture').text()
-    const avPop = rn(d3.mean(populationArray), -1)
+    const avPop = _.round(d3.mean(populationArray), -1)
     burgsFooterPopulation.value = avPop
     $('.enlarge').click(function() {
       const b = +(this.parentNode.id).slice(5)
@@ -8633,12 +8634,12 @@ function fantasyMap() {
       const b = +(this.parentNode.id).slice(5)
       const pop = getInteger(this.value)
       if (!Number.isInteger(pop) || pop < 10) {
-        const orig = rn(manors[b].population * urbanization.value * populationRate.value * 1000,
+        const orig = _.round(manors[b].population * urbanization.value * populationRate.value * 1000,
           2)
         this.value = si(orig)
         return
       }
-      populationRaw = rn(pop / urbanization.value / populationRate.value / 1000, 2)
+      populationRaw = _.round(pop / urbanization.value / populationRate.value / 1000, 2)
       const change = populationRaw - manors[b].population
       manors[b].population = populationRaw
       $(this).parent().attr('data-population', populationRaw)
@@ -8648,27 +8649,27 @@ function fantasyMap() {
       states[state].urbanPopulation += change
       updateCountryPopulationUI(state)
       const average = states[state].urbanPopulation / states[state].burgs * urbanization.value * populationRate.value * 1000
-      burgsFooterPopulation.value = rn(average, -1)
+      burgsFooterPopulation.value = _.round(average, -1)
     })
     $('#burgsFooterPopulation').on('change', function() {
       const state = +$('#burgsEditor').attr('data-state')
       const newPop = +this.value
       const avPop = states[state].urbanPopulation / states[state].burgs * urbanization.value * populationRate.value * 1000
       if (!Number.isInteger(newPop) || newPop < 10) {
-        this.value = rn(avPop, -1)
+        this.value = _.round(avPop, -1)
         return
       }
       const change = +this.value / avPop
       $('#burgsBody > div').each(function(e, i) {
         const b = +(this.id).slice(5)
-        const pop = rn(manors[b].population * change, 2)
+        const pop = _.round(manors[b].population * change, 2)
         manors[b].population = pop
         $(this).attr('data-population', pop)
         let popUI = pop * urbanization.value * populationRate.value * 1000
-        popUI = popUI > 1e4 ? si(popUI) : rn(popUI, -1)
+        popUI = popUI > 1e4 ? si(popUI) : _.round(popUI, -1)
         $(this).children().filter('.burgPopulation').val(popUI)
       })
-      states[state].urbanPopulation = rn(states[state].urbanPopulation * change, 2)
+      states[state].urbanPopulation = _.round(states[state].urbanPopulation * change, 2)
       updateCountryPopulationUI(state)
     })
     $('#burgsBody .icon-trash-empty').on('click', function() {
@@ -8689,7 +8690,7 @@ function fantasyMap() {
             countriesFooterBurgs.innerHTML = +countriesFooterBurgs.innerHTML - 1
             states[state].urbanPopulation = states[state].urbanPopulation - manors[b].population
             const avPop = states[state].urbanPopulation / states[state].burgs * urbanization.value * populationRate.value * 1000
-            burgsFooterPopulation.value = rn(avPop, -1)
+            burgsFooterPopulation.value = _.round(avPop, -1)
             if ($('#countriesEditor').is(':visible')) {
               $('#state' + state + ' > .stateBurgs').text(states[state].burgs)
             }
@@ -8794,10 +8795,10 @@ function fantasyMap() {
         rurPops[c] = 0
       }
       if (urbPops[c] === undefined) urbPops[c] = 0
-      const area = rn(areas[c] * Math.pow(distanceScale.value, 2))
+      const area = Math.round(areas[c] * Math.pow(distanceScale.value, 2))
       const areaConv = si(area) + unit
-      const urban = rn(urbPops[c] * +urbanization.value * populationRate.value)
-      const rural = rn(rurPops[c] * populationRate.value)
+      const urban = Math.round(urbPops[c] * +urbanization.value * populationRate.value)
+      const rural = Math.round(rurPops[c] * populationRate.value)
       const population = (urban + rural) * 1000
       const populationConv = si(population)
       const title = '\'Total population: ' + populationConv + '; Rural population: ' + rural + 'K; Urban population: ' + urban + 'K\''
@@ -8841,7 +8842,7 @@ function fantasyMap() {
     culturesFooterCultures.innerHTML = activeCultures + '/' + cultures.length
     culturesFooterCells.innerHTML = land.length
     let totalArea = areas.reduce(function(s, v) {return s + v})
-    totalArea = rn(totalArea * Math.pow(distanceScale.value, 2))
+    totalArea = Math.round(totalArea * Math.pow(distanceScale.value, 2))
     culturesFooterArea.innerHTML = si(totalArea) + unit
     let totalPopulation = rurPops.reduce(function(s, v) {return s + v}) * urbanization.value
     totalPopulation += urbPops.reduce(function(s, v) {return s + v})
@@ -8968,9 +8969,9 @@ function fantasyMap() {
         totalArea = getInteger(totalArea.split(' ')[0])
         const totalPopulation = getInteger(culturesFooterPopulation.innerHTML)
         $('#culturesBody > .cultures').each(function() {
-          const cells = rn($(this).attr('data-cells') / totalCells * 100)
-          const area = rn($(this).attr('data-area') / totalArea * 100)
-          const population = rn($(this).attr('data-population') / totalPopulation * 100)
+          const cells = Math.round($(this).attr('data-cells') / totalCells * 100)
+          const area = Math.round($(this).attr('data-area') / totalArea * 100)
+          const population = Math.round($(this).attr('data-population') / totalPopulation * 100)
           $(this).children().filter('.stateCells').text(cells + '%')
           $(this).children().filter('.stateArea').text(area + '%')
           $(this).children().filter('.culturePopulation').text(population + '%')
@@ -9086,7 +9087,7 @@ function fantasyMap() {
         name = defaultCultures[culture].name
       } else {
         // add random culture besed on one of the current ones
-        culture = rand(cultures.length - 1)
+        culture = _.random(cultures.length - 1)
         name = generateName(culture)
         color = colors20(cultures.length % 20)
         base = cultures[culture].base
@@ -9484,8 +9485,8 @@ function fantasyMap() {
   // update only UI and sorting value in countryEditor screen
   function updateCountryPopulationUI(s) {
     if ($('#countriesEditor').is(':visible')) {
-      const urban = rn(states[s].urbanPopulation * +urbanization.value * populationRate.value)
-      const rural = rn(states[s].ruralPopulation * populationRate.value)
+      const urban = Math.round(states[s].urbanPopulation * +urbanization.value * populationRate.value)
+      const rural = Math.round(states[s].ruralPopulation * populationRate.value)
       const population = (urban + rural) * 1000
       $('#state' + s).attr('data-population', population)
       $('#state' + s).children().filter('.statePopulation').val(si(population))
@@ -9603,12 +9604,12 @@ function fantasyMap() {
       recalculateStateData(s.i)
       $('#state' + s.i + ' > .stateCells').text(s.cells)
       $('#state' + s.i + ' > .stateBurgs').text(s.burgs)
-      const area = rn(s.area * Math.pow(distanceScale.value, 2))
+      const area = Math.round(s.area * Math.pow(distanceScale.value, 2))
       const unit = areaUnit.value === 'square' ? ' ' + distanceUnit.value + '²' :
                    ' ' + areaUnit.value
       $('#state' + s.i + ' > .stateArea').text(si(area) + unit)
-      const urban = rn(s.urbanPopulation * urbanization.value * populationRate.value)
-      const rural = rn(s.ruralPopulation * populationRate.value)
+      const urban = Math.round(s.urbanPopulation * urbanization.value * populationRate.value)
+      const rural = Math.round(s.ruralPopulation * populationRate.value)
       const population = (urban + rural) * 1000
       $('#state' + s.i + ' > .statePopulation').val(si(population))
       $('#state' + s.i).attr('data-cells', s.cells).attr('data-burgs', s.burgs)
@@ -9768,7 +9769,7 @@ function fantasyMap() {
       const scalePos = sessionStorage.getItem('scaleBar').split(',')
       tr = [+scalePos[0] - bbox.width, +scalePos[1] - bbox.height]
     }
-    el.attr('transform', 'translate(' + rn(tr[0]) + ',' + rn(tr[1]) + ')')
+    el.attr('transform', 'translate(' + Math.round(tr[0]) + ',' + Math.round(tr[1]) + ')')
   }
 
   // Other Options handlers
@@ -9795,10 +9796,10 @@ function fantasyMap() {
     }
     if (id === 'regionsInput') {
       regionsOutput.value = this.value
-      let size = rn(6 - this.value / 20)
+      let size = Math.round(6 - this.value / 20)
       if (size < 3) {size = 3}
       burgLabels.select('#capitals').attr('data-size', size)
-      size = rn(18 - this.value / 6)
+      size = Math.round(18 - this.value / 6)
       if (size < 4) {size = 4}
       labels.select('#countries').attr('data-size', size)
       localStorage.setItem('regions', this.value)
@@ -9869,11 +9870,11 @@ function fantasyMap() {
           label = si(areaConv) + ' ' + unit
         } else {
           const dist = +g.select('text').attr('data-dist')
-          label = rn(dist * scale) + ' ' + dUnit
+          label = Math.round(dist * scale) + ' ' + dUnit
         }
         g.select('text').text(label)
       })
-      ruler.selectAll('.gray').attr('stroke-dasharray', rn(30 / scale, 2))
+      ruler.selectAll('.gray').attr('stroke-dasharray', _.round(30 / scale, 2))
       drawScaleBar()
       updateCountryEditors()
     }
@@ -9940,7 +9941,7 @@ function fantasyMap() {
   $('#optionsReset').click(restoreDefaultOptions)
 
   $('#rescaler').change(function() {
-    const change = rn((+this.value - 5), 2)
+    const change = _.round((+this.value - 5), 2)
     modifyHeights('all', change, 1)
     updateHeightmap()
     updateHistory()

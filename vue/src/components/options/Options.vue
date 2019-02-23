@@ -49,7 +49,6 @@
 <script>
 import * as $ from 'jquery'
 import * as d3 from 'd3'
-import {rn} from '../utils'
 import LayoutContent from './LayoutContent.vue'
 import StyleContent from './StyleContent.vue'
 import OptionsContent from './OptionsContent.vue'
@@ -181,7 +180,7 @@ export default {
       }
       if ($('#styleOverlayType').value === 'pointyHex' || $('#styleOverlayType').value === 'flatHex')
         size *= Math.cos(30 * Math.PI / 180) * 2
-      $('#styleOverlaySizeFriendly').value = '(' + rn(size * $('#distanceScale').value) + ' ' + $('#distanceUnit').value + ')'
+      $('#styleOverlaySizeFriendly').value = '(' + Math.round(size * $('#distanceScale').value) + ' ' + $('#distanceUnit').value + ')'
     }
   }
 }
