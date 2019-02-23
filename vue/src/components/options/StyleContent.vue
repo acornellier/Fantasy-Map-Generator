@@ -36,7 +36,7 @@
       <option value="windrose">Wind rose</option>
     </select><br>
       <br>Size:
-      <input id="styleOverlaySize" type="range" min="2" max="50" step="0.1" value="10" @change="changeSize">
+      <input id="styleOverlaySize" type="range" min="2" max="50" step="0.1" value="10" @change="changeSize($event)">
       <output id="styleOverlaySizeOutput" onmouseover="tip('Overlay size')">10</output>
       <output id="styleOverlaySizeFriendly"
               onmouseover="tip('Size between two adjacent cells in map scale')">(52 mi)
@@ -44,37 +44,37 @@
     </div>
     <div id="styleOcean">
       <br>Elements:
-      <input id="styleOceanPattern" class="checkbox" type="checkbox" checked>
+      <input id="styleOceanPattern" class="checkbox" type="checkbox" checked @change="styleOceanPattern($event)">
       <label for="styleOceanPattern" onmouseover="tip('Toggle ocean pattern')"
              class="checkbox-label">Pattern</label>
-      <input id="styleOceanLayers" class="checkbox" type="checkbox" checked>
+      <input id="styleOceanLayers" class="checkbox" type="checkbox" checked @change="styleOceanLayers($event)">
       <label for="styleOceanLayers" onmouseover="tip('Toggle ocean layers')"
              class="checkbox-label">Layers</label><br>
-      Background: <input id="styleOceanBack" type="color" value="#000000"/>
+      Background: <input id="styleOceanBack" type="color" value="#000000" @input="styleOceanBack($event)"/>
       <output id="styleOceanBackOutput">#000000</output>
       <br>
-      Foreground: <input id="styleOceanFore" type="color" value="#53679f"/>
+      Foreground: <input id="styleOceanFore" type="color" value="#53679f" @input="styleOceanFore($event)"/>
       <output id="styleOceanForeOutput">#53679f</output>
     </div>
     <div id="styleFill">
-      Fill: <input id="styleFillInput" type="color" value="#5E4FA2"/>
+      Fill: <input id="styleFillInput" type="color" value="#5E4FA2" @input="inputFill($event)"/>
       <output id="styleFillOutput">#5E4FA2</output>
     </div>
     <div id="styleStroke">
-      Stroke: <input id="styleStrokeInput" type="color" value="#5E4FA2"/>
+      Stroke: <input id="styleStrokeInput" type="color" value="#5E4FA2" @input="inputStroke($event)"/>
       <output id="styleStrokeOutput">#5E4FA2</output>
     </div>
     <div id="styleStrokeWidth">
       <br>Stroke width: <input id="styleStrokeWidthInput" type="range" min="0" max="3"
-                               step="0.01" value="1">
+                               step="0.01" value="1" @input="inputStrokeWidth($event)">
       <output id="styleStrokeWidthOutput">1</output>
     </div>
     <div id="styleStrokeDasharray">
       <br>Stroke dasharray: <input id="styleStrokeDasharrayInput" class="pureInput"
-                                   value="1 2">
+                                   value="1 2" @input="inputStrokeDasharray($event)">
     </div>
     <div id="styleStrokeLinecap">
-      <br>Stroke linecap: <select id="styleStrokeLinecapInput" class="pureInput">
+      <br>Stroke linecap: <select id="styleStrokeLinecapInput" class="pureInput" @change="inputStrokeLinecap($event)">
       <option value="inherit" selected>Inherit</option>
       <option value="butt">Butt</option>
       <option value="round">Round</option>
@@ -109,11 +109,11 @@
 
     <div id="styleOpacity">
       <br>Opacity: <input id="styleOpacityInput" type="range" min="0" max="1" step="0.01"
-                          value="1">
+                          value="1" @input="inputStyleOpacity($event)">
       <output id="styleOpacityOutput">1</output>
     </div>
     <div id="styleFilter">
-      <br>Filter: <select id="styleFilterInput" class="pureInput">
+      <br>Filter: <select id="styleFilterInput" class="pureInput" @change="inputStyleFilter($event)">
       <option value="" selected>None</option>
       <option value="url(#blurFilter)">Blur 0.2</option>
       <option value="url(#blur1)">Blur 1</option>
@@ -130,7 +130,7 @@
     </select>
     </div>
     <div id="styleScheme">
-      <br>Color scheme: <select id="styleSchemeInput" class="pureInput">
+      <br>Color scheme: <select id="styleSchemeInput" class="pureInput" @change=inputStyleScheme()>
       <option value="bright" selected>Bright</option>
       <option value="light">Light</option>
       <option value="green">Green</option>
@@ -162,17 +162,19 @@
 import * as $ from 'jquery'
 import * as d3 from 'd3'
 
+const svg = () => d3.select('svg')
+const viewbox = () => svg().select('#viewbox')
+const selectedValue = () => document.getElementById('styleElementSelect').value
+const selectedElement = () => svg().select('#' + selectedValue())
+
 export default {
   name: 'StyleContent',
   methods: {
     selectStyle(event) {
-      const svg = d3.select('svg')
-      const viewbox = svg.select("#viewbox");
-      const ocean = viewbox.select("#ocean");
-      const oceanLayers = ocean.select("#oceanLayers");
+      const oceanLayers = viewbox().select("#ocean").select("#oceanLayers");
 
       const sel = event.target.value;
-      let el = viewbox.select("#"+sel);
+      let el = viewbox().select("#"+sel);
       if (sel == "ocean") el = oceanLayers.select("rect");
       $("#styleInputs > div").hide();
 
@@ -218,7 +220,7 @@ export default {
 
       if (sel === "ocean") {
         $("#styleOcean").css("display", "block");
-        $('#styleOceanBack').value = $('#styleOceanBackOutput').value = svg.style("background-color");
+        $('#styleOceanBack').value = $('#styleOceanBackOutput').value = svg().style("background-color");
         $('#styleOceanFore').value = $('#styleOceanForeOutput').value = oceanLayers.select("rect").attr("fill");
       }
 
@@ -228,29 +230,84 @@ export default {
       }
     },
     restoreStyles() {
-      $('alertMessage').innerHTML = 'Are you sure you want to restore default style?'
+      $('#alertMessage').innerHTML = 'Are you sure you want to restore default style?'
+      const applyDefaultStyle = () => this.$emit('applyDefaultStyle')
       $('#alert').dialog({
         resizable: false, title: 'Restore style',
         buttons: {
-          Restore: function() {
-            this.$emit('applyDefaultStyle')
+          Restore: () => {
+            applyDefaultStyle()
             $(this).dialog('close')
           },
-          Cancel: function() {
+          Cancel: () => {
             $(this).dialog('close')
           }
         }
       })
     },
     selectType() {
-      d3.select('svg').select('#viewbox').select('#overlay').selectAll('*').remove()
+      viewbox().select('#overlay').selectAll('*').remove()
       if (!$('#toggleOverlay').hasClass('buttonoff'))
         this.$emit("toggleOverlay")
     },
-    changeSize() {
+    changeSize(event) {
       this.selectType()
-      $('#styleOverlaySizeOutput').value = this.value
-    }
+      $('#styleOverlaySizeOutput').value = event.target.value
+    },
+    inputFill(event) {
+      $('#styleFillOutput').value = event.target.value
+      const el = selectedElement()
+      if ($('#styleElementSelect').value !== 'labels') {
+        el.attr('fill', event.target.value)
+      } else {
+        el.selectAll('g').attr('fill', event.target.value)
+      }
+    },
+    inputStroke(event) {
+      $('#styleStrokeOutput').value = event.target.value
+      selectedElement().attr('stroke', event.target.value)
+    },
+    inputStrokeWidth(event) {
+      $('#styleStrokeWidthOutput').value = event.target.value
+      selectedElement().attr('stroke-width', +event.target.value)
+    },
+    inputStrokeDasharray(event) {
+      selectedElement().attr('stroke-dasharray', event.target.value)
+    },
+    inputStrokeLinecap(event) {
+      selectedElement().attr('stroke-linecap', event.target.value)
+    },
+    inputStyleOpacity(event) {
+      $('#styleOpacityOutput').value = event.target.value
+      selectedElement().attr('opacity', event.target.value)
+    },
+    inputStyleFilter(event) {
+      let sel = selectedValue()
+      if (sel == 'ocean') sel = 'oceanLayers'
+      const el = svg().select('#' + sel)
+      el.attr('filter', event.target.value)
+    },
+    inputStyleScheme() {
+      viewbox().select('#terrs').selectAll('path').remove()
+      this.$emit('toggleHeight')
+    },
+    styleOceanBack(event) {
+      svg().style('background-color', event.target.value)
+      $('#styleOceanBackOutput').value = event.target.value
+    },
+    styleOceanFore(event) {
+      viewbox().select('#ocean').select('#oceanLayers').select('rect').attr('fill', event.target.value)
+      $('styleOceanForeOutput').value = event.target.value
+    },
+    styleOceanLayers(event) {
+      const oceanLayers = viewbox().select('#ocean').select('#oceanLayers')
+      const display = event.target.checked ? 'block' : 'none'
+      oceanLayers.selectAll('path').attr('display', display)
+    },
+    styleOceanPattern(event) {
+      const oceanPattern = viewbox().select('#ocean').select('#oceanPattern')
+      oceanPattern.attr('opacity', +event.target.checked)
+    },
   },
 }
 </script>

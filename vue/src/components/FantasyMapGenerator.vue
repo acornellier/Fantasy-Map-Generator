@@ -12,6 +12,7 @@
   <Options
     @updateLabelGroups="updateLabelGroups"
     @applyDefaultStyle="applyDefaultStyle"
+    @toggleHeight="toggleHeight"
   />
   <Dialogs/>
   <div id="map-dragged" style="display: none">
@@ -65,6 +66,7 @@ export default {
   methods: {
     updateLabelGroups() { updateLabelGroups() },
     applyDefaultStyle() { applyDefaultStyle() },
+    toggleHeight() { toggleHeight() },
   },
 }
 
@@ -301,7 +303,7 @@ let cultureTree
 
 // global methods
 
-// downalod map as SVG or PNG file
+// download map as SVG or PNG file
 function saveAsImage(type) {
   console.time('saveAsImage')
   const webSafe = ['Georgia', 'Times+New+Roman', 'Comic+Sans+MS', 'Lucida+Sans+Unicode', 'Courier+New', 'Verdana', 'Arial', 'Impact']
@@ -560,7 +562,6 @@ function moved() {
   }
 }
 
-// update Label Groups displayed on Style tab
 function updateLabelGroups() {
   if ($('#styleElementSelect').value !== 'labels') return
   const cont = d3.select('#styleLabelGroupItems')
@@ -583,7 +584,6 @@ function updateLabelGroups() {
   })
 }
 
-// restore initial style
 function applyDefaultStyle() {
   viewbox.on('touchmove mousemove', moved)
   landmass.attr('opacity', 1).attr('fill', '#eef6fb')
@@ -644,6 +644,35 @@ function applyDefaultStyle() {
        .attr('stroke-width', 1.2).attr('size', 2)
   icons.select('#town-anchors').attr('fill', '#ffffff').attr('stroke', '#3e3e4b')
        .attr('stroke-width', 1.2).attr('size', 1)
+}
+
+// draw the heightmap
+function toggleHeight() {
+  const scheme = $('#styleSchemeInput').value
+  let hColor = color
+  if (scheme === 'light') hColor = d3.scaleSequential(d3chromatic.interpolateRdYlGn)
+  if (scheme === 'green') hColor = d3.scaleSequential(d3chromatic.interpolateGreens)
+  if (scheme === 'monochrome') hColor = d3.scaleSequential(d3chromatic.interpolateGreys)
+  if (!terrs.selectAll('path').size()) {
+    cells.map(function(i, d) {
+      let height = i.height
+      if (height < 20 && !i.lake) return
+      if (i.lake) {
+        const nHeights = i.neighbors.map(
+          function(e) {if (cells[e].height >= 20) return cells[e].height})
+        const mean = d3.mean(nHeights)
+        if (!mean) return
+        height = Math.trunc(mean)
+        if (height < 20 || isNaN(height)) height = 20
+      }
+      const clr = hColor((100 - height) / 100)
+      terrs.append('path')
+           .attr('d', 'M' + polygons[d].join('L') + 'Z')
+           .attr('fill', clr).attr('stroke', clr)
+    })
+  } else {
+    terrs.selectAll('path').remove()
+  }
 }
 
 function fantasyMap() {
@@ -5949,35 +5978,6 @@ function fantasyMap() {
     zoomTo(x, y, 8, 1600)
   }
 
-  // draw the Heightmap
-  function toggleHeight() {
-    const scheme = styleSchemeInput.value
-    let hColor = color
-    if (scheme === 'light') hColor = d3.scaleSequential(d3chromatic.interpolateRdYlGn)
-    if (scheme === 'green') hColor = d3.scaleSequential(d3chromatic.interpolateGreens)
-    if (scheme === 'monochrome') hColor = d3.scaleSequential(d3chromatic.interpolateGreys)
-    if (!terrs.selectAll('path').size()) {
-      cells.map(function(i, d) {
-        let height = i.height
-        if (height < 20 && !i.lake) return
-        if (i.lake) {
-          const nHeights = i.neighbors.map(
-            function(e) {if (cells[e].height >= 20) return cells[e].height})
-          const mean = d3.mean(nHeights)
-          if (!mean) return
-          height = Math.trunc(mean)
-          if (height < 20 || isNaN(height)) height = 20
-        }
-        const clr = hColor((100 - height) / 100)
-        terrs.append('path')
-             .attr('d', 'M' + polygons[d].join('L') + 'Z')
-             .attr('fill', clr).attr('stroke', clr)
-      })
-    } else {
-      terrs.selectAll('path').remove()
-    }
-  }
-
   // draw Cultures
   function toggleCultures() {
     if (cults.selectAll('path').size() == 0) {
@@ -7205,7 +7205,6 @@ function fantasyMap() {
     const id = this.id
     const parent = this.parentNode.id
     if (debug.selectAll('.tag').size()) {debug.selectAll('.tag, .line').remove()}
-    if (id === 'toggleHeight') {toggleHeight()}
     if (id === 'toggleCountries') {$('#regions').fadeToggle()}
     if (id === 'toggleCultures') {toggleCultures()}
     if (id === 'toggleFlux') {toggleFlux()}
@@ -9771,77 +9770,6 @@ function fantasyMap() {
     }
     el.attr('transform', 'translate(' + rn(tr[0]) + ',' + rn(tr[1]) + ')')
   }
-
-  $('#styleFillInput').on('input', function() {
-    styleFillOutput.value = this.value
-    const el = svg.select('#' + styleElementSelect.value)
-    if (styleElementSelect.value !== 'labels') {
-      el.attr('fill', this.value)
-    } else {
-      el.selectAll('g').attr('fill', this.value)
-    }
-  })
-
-  $('#styleStrokeInput').on('input', function() {
-    styleStrokeOutput.value = this.value
-    const el = svg.select('#' + styleElementSelect.value)
-    el.attr('stroke', this.value)
-  })
-
-  $('#styleStrokeWidthInput').on('input', function() {
-    styleStrokeWidthOutput.value = this.value
-    const el = svg.select('#' + styleElementSelect.value)
-    el.attr('stroke-width', +this.value)
-  })
-
-  $('#styleStrokeDasharrayInput').on('input', function() {
-    const sel = styleElementSelect.value
-    svg.select('#' + sel).attr('stroke-dasharray', this.value)
-  })
-
-  $('#styleStrokeLinecapInput').on('change', function() {
-    const sel = styleElementSelect.value
-    svg.select('#' + sel).attr('stroke-linecap', this.value)
-  })
-
-  $('#styleOpacityInput').on('input', function() {
-    styleOpacityOutput.value = this.value
-    const sel = styleElementSelect.value
-    svg.select('#' + sel).attr('opacity', this.value)
-
-  })
-
-  $('#styleFilterInput').on('change', function() {
-    let sel = styleElementSelect.value
-    if (sel == 'ocean') sel = 'oceanLayers'
-    const el = svg.select('#' + sel)
-    el.attr('filter', this.value)
-    zoom.scaleBy(svg, 1.00001) // enforce browser re-draw
-  })
-
-  $('#styleSchemeInput').on('change', function() {
-    terrs.selectAll('path').remove()
-    toggleHeight()
-  })
-
-  $('#styleOceanBack').on('input', function() {
-    svg.style('background-color', this.value)
-    styleOceanBackOutput.value = this.value
-  })
-
-  $('#styleOceanFore').on('input', function() {
-    oceanLayers.select('rect').attr('fill', this.value)
-    styleOceanForeOutput.value = this.value
-  })
-
-  $('#styleOceanPattern').on('click', function() {
-    oceanPattern.attr('opacity', +this.checked)
-  })
-
-  $('#styleOceanLayers').on('click', function() {
-    const display = this.checked ? 'block' : 'none'
-    oceanLayers.selectAll('path').attr('display', display)
-  })
 
   // Other Options handlers
   $('input, select').on('input change', function() {

@@ -15,7 +15,7 @@
       Ocean
     </li>
     <li onmouseover="tip('Toggle Heightmap (see Style tab for styling and Customize for editting)')"
-        id="toggleHeight" class="buttonoff">
+        id="toggleHeight" class="buttonoff" onclick="this.$emit('toggleHeight')">
       Heightmap
     </li>
     <li onmouseover="tip('Toggle Grid')" id="toggleGrid" class="buttonoff"

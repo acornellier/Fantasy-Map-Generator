@@ -31,10 +31,12 @@
     </div>
     <LayoutContent
       @toggleOverlay="toggleOverlay"
+      @toggleHeight="toggleHeight"
     />
     <StyleContent
       @updateLabelGroups="updateLabelGroups"
       @applyDefaultStyle="applyDefaultStyle"
+      @toggleHeight="toggleHeight"
     />
     <OptionsContent/>
     <CustomizeContent/>
@@ -142,6 +144,7 @@ export default {
   methods: {
     updateLabelGroups() { this.$emit('updateLabelGroups') },
     applyDefaultStyle() { this.$emit('applyDefaultStyle') },
+    toggleHeight() { this.$emit('toggleHeight') },
     toggleOverlay() {
       const overlay = d3.select('svg').select('#viewbox').select('#overlay')
       if (overlay.selectAll('*').size() !== 0)
