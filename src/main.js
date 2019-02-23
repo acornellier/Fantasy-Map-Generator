@@ -8,10 +8,6 @@ Vue.config.productionTip = false
 
 window.$ = $
 window.d3 = d3
-window.graphHeight = undefined
-window.graphWidth = undefined
-window.svgWidth = undefined
-window.svgHeight = undefined
 
 new Vue({
   store,

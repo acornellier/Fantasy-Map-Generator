@@ -159,7 +159,7 @@
 </template>
 
 <script>
-import {svg, viewbox} from '../utils'
+import {svg, viewbox} from '../../utils'
 
 const selectedValue = () => document.getElementById('styleElementSelect').value
 const selectedElement = () => svg().select('#' + selectedValue())

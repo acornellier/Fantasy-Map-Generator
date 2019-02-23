@@ -4,10 +4,6 @@ export default {
     nameBases: [],
     nameBase: [],
   },
-  getters: {
-  },
-  actions: {
-  },
   mutations: {
   },
 }
