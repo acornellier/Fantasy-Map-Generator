@@ -24,18 +24,19 @@
     <option value="searoutes">Searoutes</option>
     <option value="scaleBar">Scale bar</option>
   </select>
-  <i id="restoreStyle" onmouseover="tip('Restore default style')" class="icon-ccw"></i>
+  <i id="restoreStyle" onmouseover="tip('Restore default style')" class="icon-ccw" @click="restoreStyles"></i>
   <div id="styleInputs">
     <div id="styleOverlay">
       <br><span>Ensure Overlay layer is active (see Layout tab)</span><br>
-      <br>Overlay type: <select id="styleOverlayType" class="pureInput">
+      <br>Overlay type:
+      <select id="styleOverlayType" class="pureInput" @change="selectType">
       <option value="pointyHex" selected>Hex grid (pointy)</option>
       <option value="flatHex">Hex grid (flat)</option>
       <option value="square">Square grid</option>
       <option value="windrose">Wind rose</option>
     </select><br>
-      <br>Size: <input id="styleOverlaySize" type="range" min="2" max="50" step="0.1"
-                       value="10">
+      <br>Size:
+      <input id="styleOverlaySize" type="range" min="2" max="50" step="0.1" value="10" @change="changeSize">
       <output id="styleOverlaySizeOutput" onmouseover="tip('Overlay size')">10</output>
       <output id="styleOverlaySizeFriendly"
               onmouseover="tip('Size between two adjacent cells in map scale')">(52 mi)
@@ -241,6 +242,15 @@ export default {
         }
       })
     },
+    selectType() {
+      d3.select('svg').select('#viewbox').select('#overlay').selectAll('*').remove()
+      if (!$('#toggleOverlay').hasClass('buttonoff'))
+        this.$emit("toggleOverlay")
+    },
+    changeSize() {
+      this.selectType()
+      $('#styleOverlaySizeOutput').value = this.value
+    }
   },
 }
 </script>

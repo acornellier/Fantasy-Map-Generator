@@ -50,9 +50,6 @@ import Dialogs from './dialogs/Dialogs.vue'
 import Graphic from './Graphic.vue'
 import Options from './options/Options.vue'
 
-window.$ = $
-window.d3 = d3
-
 /* eslint-disable */
 
 export default {
@@ -723,9 +720,10 @@ function fantasyMap() {
   }).curve(d3.curveCatmullRom)
 
   applyStoredOptions()
-  let graphWidth = +mapWidthInput.value // voronoi graph extention, should be stable for each map
-  let graphHeight = +mapHeightInput.value
-  let svgWidth = graphWidth, svgHeight = graphHeight  // svg canvas resolution, can vary for each map
+  graphWidth = +mapWidthInput.value // voronoi graph extention, should be stable for each map
+  graphHeight = +mapHeightInput.value
+  svgWidth = graphWidth
+  svgHeight = graphHeight  // svg canvas resolution, can vary for each map
 
   // toggle off loading screen and on menus
   $('#loading, #initial').remove()
@@ -2025,16 +2023,17 @@ function fantasyMap() {
   function elementDrag() {
     const el = d3.select(this)
     const tr = parseTransform(el.attr('transform'))
-    const dx = +tr[0] - d3.event.x, dy = +tr[1] - d3.event.y
+    const dx = +tr[0] - d3.event.x
+    const dy = +tr[1] - d3.event.y
 
     d3.event.on('drag', function() {
-      const x = d3.event.x, y = d3.event.y
+      const x = d3.event.x
+      const y = d3.event.y
       const transform = `translate(${(dx + x)},${(dy + y)}) rotate(${tr[2]} ${tr[3]} ${tr[4]})`
       el.attr('transform', transform)
       const pp = this.parentNode.parentNode.id
       if (pp === 'burgIcons' || pp === 'burgLabels') {
-        tip(
-          'Use dragging for fine-tuning only, to move burg to a different cell use "Relocate" button')
+        tip('Use dragging for fine-tuning only, to move burg to a different cell use "Relocate" button')
       }
       if (pp === 'labels') {
         // also transform curve control circle
@@ -5995,68 +5994,6 @@ function fantasyMap() {
     }
   }
 
-  // draw Overlay
-  function toggleOverlay() {
-    if (overlay.selectAll('*').size() === 0) {
-      const type = styleOverlayType.value
-      const size = +styleOverlaySize.value
-      if (type === 'pointyHex' || type === 'flatHex') {
-        let points = getHexGridPoints(size, type)
-        let hex = 'm' + getHex(size, type).slice(0, 4).join('l')
-        let d = points.map(function(p) {return 'M' + p + hex}).join('')
-        overlay.append('path').attr('d', d)
-      } else if (type === 'square') {
-        const x = d3.range(size, svgWidth, size)
-        const y = d3.range(size, svgHeight, size)
-        overlay.append('g').selectAll('line').data(x).enter().append('line')
-               .attr('x1', function(d) {return d})
-               .attr('x2', function(d) {return d})
-               .attr('y1', 0).attr('y2', svgHeight)
-        overlay.append('g').selectAll('line').data(y).enter().append('line')
-               .attr('y1', function(d) {return d})
-               .attr('y2', function(d) {return d})
-               .attr('x1', 0).attr('x2', svgWidth)
-      } else {
-        const tr = `translate(80 80) scale(${size / 20})`
-        d3.select('#rose').attr('transform', tr)
-        overlay.append('use').attr('xlink:href', '#rose')
-      }
-      overlay.call(d3.drag().on('start', elementDrag))
-      calculateFriendlyOverlaySize()
-    } else {
-      overlay.selectAll('*').remove()
-    }
-  }
-
-  function getHex(radius, type) {
-    let x0 = 0, y0 = 0
-    let s = type === 'pointyHex' ? 0 : Math.PI / -6
-    let thirdPi = Math.PI / 3
-    let angles = [s, s + thirdPi, s + 2 * thirdPi, s + 3 * thirdPi, s + 4 * thirdPi, s + 5 * thirdPi]
-    return angles.map(function(angle) {
-      const x1 = Math.sin(angle) * radius,
-        y1 = -Math.cos(angle) * radius,
-        dx = x1 - x0,
-        dy = y1 - y0
-      x0 = x1, y0 = y1
-      return [dx, dy]
-    })
-  }
-
-  function getHexGridPoints(size, type) {
-    let points = []
-    const rt3 = Math.sqrt(3)
-    const off = type === 'pointyHex' ? rt3 * size / 2 : size * 3 / 2
-    const ySpace = type === 'pointyHex' ? size * 3 / 2 : rt3 * size / 2
-    const xSpace = type === 'pointyHex' ? rt3 * size : size * 3
-    for (let y = 0, l = 0; y < graphHeight; y += ySpace, l++) {
-      for (let x = l % 2 ? 0 : off; x < graphWidth; x += xSpace) {
-        points.push([x, y])
-      }
-    }
-    return points
-  }
-
   // clean data to get rid of redundand info
   function cleanData() {
     console.time('cleanData')
@@ -7271,7 +7208,6 @@ function fantasyMap() {
     if (id === 'toggleHeight') {toggleHeight()}
     if (id === 'toggleCountries') {$('#regions').fadeToggle()}
     if (id === 'toggleCultures') {toggleCultures()}
-    if (id === 'toggleOverlay') {toggleOverlay()}
     if (id === 'toggleFlux') {toggleFlux()}
     if (parent === 'mapLayers' || parent === 'styleContent') {$(this).toggleClass('buttonoff')}
     if (id === 'randomMap' || id === 'regenerate') {
@@ -9888,29 +9824,6 @@ function fantasyMap() {
     toggleHeight()
   })
 
-  $('#styleOverlayType').on('change', function() {
-    overlay.selectAll('*').remove()
-    if (!$('#toggleOverlay').hasClass('buttonoff')) toggleOverlay()
-  })
-
-  $('#styleOverlaySize').on('change', function() {
-    overlay.selectAll('*').remove()
-    if (!$('#toggleOverlay').hasClass('buttonoff')) toggleOverlay()
-    styleOverlaySizeOutput.value = this.value
-  })
-
-  function calculateFriendlyOverlaySize() {
-    let size = styleOverlaySize.value
-    if (styleOverlayType.value === 'windrose') {
-      styleOverlaySizeFriendly.innerHTML = ''
-      return
-    }
-    if (styleOverlayType.value === 'pointyHex' || styleOverlayType.value === 'flatHex') size *=
-      Math.cos(30 * Math.PI / 180) * 2
-    let friendly = '(' + rn(size * distanceScale.value) + ' ' + distanceUnit.value + ')'
-    styleOverlaySizeFriendly.value = friendly
-  }
-
   $('#styleOceanBack').on('input', function() {
     svg.style('background-color', this.value)
     styleOceanBackOutput.value = this.value
@@ -9921,7 +9834,9 @@ function fantasyMap() {
     styleOceanForeOutput.value = this.value
   })
 
-  $('#styleOceanPattern').on('click', function() {oceanPattern.attr('opacity', +this.checked)})
+  $('#styleOceanPattern').on('click', function() {
+    oceanPattern.attr('opacity', +this.checked)
+  })
 
   $('#styleOceanLayers').on('click', function() {
     const display = this.checked ? 'block' : 'none'

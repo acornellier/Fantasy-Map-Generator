@@ -23,7 +23,7 @@
       Grid
     </li>
     <li onmouseover="tip('Toggle Overlay (overlay type can be set in Style tab)')"
-        id="toggleOverlay" class="buttonoff">
+        id="toggleOverlay" class="buttonoff" @click="toggleOverlay">
       Overlay
     </li>
     <li onmouseover="tip('Toggle Cultural map (does not work good when counties layer is on)')"
@@ -91,6 +91,7 @@ export default {
   name: 'LayoutContent',
   methods: {
     fadeToggle(id) { $(id).fadeToggle() },
+    toggleOverlay() { this.$emit("toggleOverlay") },
   },
 }
 </script>

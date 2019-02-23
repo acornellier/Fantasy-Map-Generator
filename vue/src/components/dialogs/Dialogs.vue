@@ -24,25 +24,25 @@
 </template>
 
 <script>
-  import RiverEditor from './RiverEditor'
-  import LabelsEditor from './LabelsEditor'
-  import RouteEditor from './RouteEditor'
-  import IconEditor from './IconEditor'
-  import ReliefEditor from './ReliefEditor'
-  import BurgEditor from './BurgEditor'
-  import MarkerEditor from './MarkerEditor'
-  import TemplateEditor from './TemplateEditor'
-  import ImageConverter from './ImageConverter'
-  import BrushesPanel from './BrushesPanel'
-  import PerspectivePanel from './PerspectivePanel'
-  import CountriesEditor from './CountriesEditor'
-  import BurgsEditor from './BurgsEditor'
-  import CulturesEditor from './CulturesEditor'
-  import NamesBaseEditor from './NamesBaseEditor'
-  import LegendEditor from './LegendEditor'
-  import ScaleEditor from './ScaleEditor'
+import RiverEditor from './RiverEditor'
+import LabelsEditor from './LabelsEditor'
+import RouteEditor from './RouteEditor'
+import IconEditor from './IconEditor'
+import ReliefEditor from './ReliefEditor'
+import BurgEditor from './BurgEditor'
+import MarkerEditor from './MarkerEditor'
+import TemplateEditor from './TemplateEditor'
+import ImageConverter from './ImageConverter'
+import BrushesPanel from './BrushesPanel'
+import PerspectivePanel from './PerspectivePanel'
+import CountriesEditor from './CountriesEditor'
+import BurgsEditor from './BurgsEditor'
+import CulturesEditor from './CulturesEditor'
+import NamesBaseEditor from './NamesBaseEditor'
+import LegendEditor from './LegendEditor'
+import ScaleEditor from './ScaleEditor'
 
-  export default {
+export default {
   name: 'Dialogs',
   components: {
     ScaleEditor,
@@ -62,7 +62,7 @@
     RouteEditor,
     LabelsEditor,
     RiverEditor,
-  }
+  },
 }
 </script>
 

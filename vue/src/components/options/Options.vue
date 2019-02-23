@@ -29,7 +29,9 @@
         ?
       </button>
     </div>
-    <LayoutContent/>
+    <LayoutContent
+      @toggleOverlay="toggleOverlay"
+    />
     <StyleContent
       @updateLabelGroups="updateLabelGroups"
       @applyDefaultStyle="applyDefaultStyle"
@@ -44,13 +46,43 @@
 
 <script>
 import * as $ from 'jquery'
-
+import * as d3 from 'd3'
+import {rn} from '../utils'
 import LayoutContent from './LayoutContent.vue'
 import StyleContent from './StyleContent.vue'
 import OptionsContent from './OptionsContent.vue'
 import CustomizeContent from './CustomizeContent.vue'
 import AboutContent from './AboutContent.vue'
 import Stickied from './Stickied.vue'
+
+function getHex(radius, type) {
+  let x0 = 0, y0 = 0
+  let s = type === 'pointyHex' ? 0 : Math.PI / -6
+  let thirdPi = Math.PI / 3
+  let angles = [s, s + thirdPi, s + 2 * thirdPi, s + 3 * thirdPi, s + 4 * thirdPi, s + 5 * thirdPi]
+  return angles.map(function(angle) {
+    const x1 = Math.sin(angle) * radius,
+      y1 = -Math.cos(angle) * radius,
+      dx = x1 - x0,
+      dy = y1 - y0
+    x0 = x1, y0 = y1
+    return [dx, dy]
+  })
+}
+
+function getHexGridPoints(size, type) {
+  let points = []
+  const rt3 = Math.sqrt(3)
+  const off = type === 'pointyHex' ? rt3 * size / 2 : size * 3 / 2
+  const ySpace = type === 'pointyHex' ? size * 3 / 2 : rt3 * size / 2
+  const xSpace = type === 'pointyHex' ? rt3 * size : size * 3
+  for (let y = 0, l = 0; y < graphHeight; y += ySpace, l++) {
+    for (let x = l % 2 ? 0 : off; x < graphWidth; x += xSpace) {
+      points.push([x, y])
+    }
+  }
+  return points
+}
 
 export default {
   name: 'Options',
@@ -110,6 +142,44 @@ export default {
   methods: {
     updateLabelGroups() { this.$emit('updateLabelGroups') },
     applyDefaultStyle() { this.$emit('applyDefaultStyle') },
+    toggleOverlay() {
+      const overlay = d3.select('svg').select('#viewbox').select('#overlay')
+      if (overlay.selectAll('*').size() !== 0)
+        overlay.selectAll('*').remove()
+
+      const type = $('#styleOverlayType').value
+      let size = +$('#styleOverlaySize').value
+      if (type === 'pointyHex' || type === 'flatHex') {
+        let points = getHexGridPoints(size, type)
+        let hex = 'm' + getHex(size, type).slice(0, 4).join('l')
+        let d = points.map(function(p) {return 'M' + p + hex}).join('')
+        overlay.append('path').attr('d', d)
+      } else if (type === 'square') {
+        const x = d3.range(size, svgWidth, size)
+        const y = d3.range(size, svgHeight, size)
+        overlay.append('g').selectAll('line').data(x).enter().append('line')
+               .attr('x1', function(d) {return d})
+               .attr('x2', function(d) {return d})
+               .attr('y1', 0).attr('y2', svgHeight)
+        overlay.append('g').selectAll('line').data(y).enter().append('line')
+               .attr('y1', function(d) {return d})
+               .attr('y2', function(d) {return d})
+               .attr('x1', 0).attr('x2', svgWidth)
+      } else {
+        const tr = `translate(80 80) scale(${size / 20})`
+        d3.select('#rose').attr('transform', tr)
+        overlay.append('use').attr('xlink:href', '#rose')
+      }
+      // overlay.call(d3.drag().on('start', elementDrag))
+
+      if ($('#styleOverlayType').value === 'windrose') {
+        $('#styleOverlaySizeFriendly').innerHTML = ''
+        return
+      }
+      if ($('#styleOverlayType').value === 'pointyHex' || $('#styleOverlayType').value === 'flatHex')
+        size *= Math.cos(30 * Math.PI / 180) * 2
+      $('#styleOverlaySizeFriendly').value = '(' + rn(size * $('#distanceScale').value) + ' ' + $('#distanceUnit').value + ')'
+    }
   }
 }
 </script>
