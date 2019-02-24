@@ -165,3 +165,19 @@ export const ICONS = [
 
 export const FONTS = ['Almendra+SC', 'Georgia', 'Times+New+Roman', 'Comic+Sans+MS', 'Lucida+Sans+Unicode', 'Courier+New']
 export const VOWELS = 'aeiouy'
+
+export const DEFAULT_CULTURES = [
+  {name: 'Shwazen', color: '#b3b3b3', base: 0},
+  {name: 'Angshire', color: '#fca463', base: 1},
+  {name: 'Luari', color: '#99acfb', base: 2},
+  {name: 'Tallian', color: '#a6d854', base: 3},
+  {name: 'Toledi', color: '#ffd92f', base: 4},
+  {name: 'Slovian', color: '#e5c494', base: 5},
+  {name: 'Norse', color: '#dca3e4', base: 6},
+  {name: 'Elladian', color: '#66c4a0', base: 7},
+  {name: 'Latian', color: '#ff7174', base: 8},
+  {name: 'Soomi', color: '#85c8fa', base: 9},
+  {name: 'Koryo', color: '#578880', base: 10},
+  {name: 'Hantzu', color: '#becb8d', base: 11},
+  {name: 'Yamoto', color: '#ffd9da', base: 12}
+]
