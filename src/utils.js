@@ -1,8 +1,13 @@
 import * as d3 from 'd3'
+import * as d3chromatic from 'd3-scale-chromatic'
 import * as _ from 'lodash'
 
 export const svg = () => d3.select('svg')
 export const viewbox = () => svg().select('#viewbox')
+
+export const color = d3.scaleSequential(d3chromatic.interpolateSpectral)
+export const colors8 = d3.scaleOrdinal(d3chromatic.schemeSet2)
+export const colors20 = d3.scaleOrdinal(d3.schemeCategory20)
 
 // convert RGB color string to HEX without #
 export function toHEX(rgb) {

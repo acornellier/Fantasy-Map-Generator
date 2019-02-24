@@ -49,7 +49,7 @@ import * as $ from 'jquery'
 import 'jquery-ui-bundle'
 import 'jquery-ui-bundle/jquery-ui.css'
 import * as _ from 'lodash'
-import {toHEX, round, si, getInteger, GFontToDataURI, ifDefined} from '../utils'
+import {color, colors8, colors20, toHEX, round, si, getInteger, GFontToDataURI, ifDefined} from '../utils'
 import {ICONS, FONTS, VOWELS, DEFAULT_CULTURES} from '../constants'
 import Dialogs from './dialogs/Dialogs.vue'
 import Graphic from './Graphic.vue'
@@ -584,11 +584,6 @@ export default {
     // canvas element for raster images
     const canvas = document.getElementById('canvas')
     const ctx = canvas.getContext('2d')
-
-    // Color schemes
-    let color = d3.scaleSequential(d3chromatic.interpolateSpectral)
-    const colors8 = d3.scaleOrdinal(d3chromatic.schemeSet2)
-    const colors20 = d3.scaleOrdinal(d3.schemeCategory20)
 
     // D3 drag and zoom behavior
     let scale = 1, viewX = 0, viewY = 0
@@ -2648,7 +2643,6 @@ export default {
         } else {
           // label is not a country name, use random culture
           let c = elSelected.node().getBBox()
-          let closest = cultureTree.find((c.x + c.width / 2), (c.y + c.height / 2))
           let culture = Math.floor(Math.random() * cultures.length)
           name = generateName(culture)
         }
@@ -8525,13 +8519,12 @@ export default {
       if (regions.style('display') !== 'none') $('#toggleCountries').click()
       layoutPreset.value = 'layoutCultural'
       $('#culturesBody').empty()
-      $('#culturesHeader').children().removeClass(
-        'icon-sort-name-up icon-sort-name-down icon-sort-number-up icon-sort-number-down')
+      $('#culturesHeader').children().removeClass('icon-sort-name-up icon-sort-name-down icon-sort-number-up icon-sort-number-down')
 
       // collect data
       const cellsC = [], areas = [], rurPops = [], urbPops = []
-      const unit = areaUnit.value === 'square' ? ' ' + distanceUnit.value + '²' :
-                   ' ' + areaUnit.value
+      const unit = areaUnit.value === 'square' ? ' ' + distanceUnit.value + '²'
+                                               : ' ' + areaUnit.value
       land.map(function(l) {
         const c = l.culture
         if (c === undefined) return
@@ -8653,8 +8646,7 @@ export default {
       $('#culturesBody .icon-trash-empty').on('click', function() {
         const c = +(this.parentNode.id).slice(7)
         cultures.splice(c, 1)
-        const centers = cultures.map(function(c) {return c.center})
-        cultureTree = d3.quadtree(centers)
+        cultureTree = d3.quadtree(cultures.map(function(c) {return c.center}))
         recalculateCultures('fullRedraw')
         editCultures()
       })
@@ -8703,8 +8695,7 @@ export default {
           const x = d3.event.x, y = d3.event.y
           el.attr('cx', x).attr('cy', y)
           cultures[c].center = [x, y]
-          const centers = cultures.map(function(c) {return c.center})
-          cultureTree = d3.quadtree(centers)
+          cultureTree = d3.quadtree(cultures.map(function(c) {return c.center}))
           recalculateCultures()
         })
       }
@@ -8842,8 +8833,7 @@ export default {
           base = cultures[culture].base
         }
         cultures.push({name, color, base, center})
-        const centers = cultures.map(function(c) {return c.center})
-        cultureTree = d3.quadtree(centers)
+        cultureTree = d3.quadtree(cultures.map(function(c) {return c.center}))
         recalculateCultures()
         editCultures()
       })

@@ -90,5 +90,5 @@ export default {
         commit('calculateChain', {index})
       }
     }
-  }
+  },
 }
