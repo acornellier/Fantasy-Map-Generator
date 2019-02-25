@@ -9416,7 +9416,7 @@ export default {
     // change svg size on manual size change or window resize, do not change graph size
     function changeMapSize() {
       fitScaleBar()
-      self.setDimensions('svg', +mapHeightInput, +mapWidthInput.value)
+      self.setDimensions('svg', +mapHeightInput.value, +mapWidthInput.value)
       svg.attr('width', self.svgWidth).attr('height', self.svgHeight)
       const width = Math.max(self.svgWidth, self.graphWidth)
       const height = Math.max(self.svgHeight, self.graphHeight)
