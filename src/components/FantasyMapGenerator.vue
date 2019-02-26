@@ -38,7 +38,7 @@
 
 <script>
 /* eslint-disable */
-import {mapState} from 'vuex'
+import {mapState, mapMutations, mapActions} from 'vuex'
 import seedrandom from 'seedrandom'
 import * as d3 from 'd3'
 import * as d3chromatic from 'd3-scale-chromatic'
@@ -50,7 +50,7 @@ import 'jquery-ui-bundle'
 import 'jquery-ui-bundle/jquery-ui.css'
 import * as _ from 'lodash'
 import {color, colors8, colors20, toHEX, round, si, getInteger, GFontToDataURI, ifDefined} from '../utils'
-import {ICONS, FONTS, VOWELS, DEFAULT_CULTURES} from '../constants'
+import {ICONS, FONTS, VOWELS} from '../constants'
 import Dialogs from './dialogs/Dialogs.vue'
 import Graphic from './Graphic.vue'
 import Options from './options/Options.vue'
@@ -111,8 +111,6 @@ let states = []
 let features = []
 let notes = []
 let queue = []
-let cultures = []
-let cultureTree
 
 // download map as SVG or PNG file
 function saveAsImage(type) {
@@ -251,8 +249,19 @@ function getFriendlyHeight(h) {
   return h + ' (' + Math.round(height * unitRatio) + ' ' + unit + ')'
 }
 
+// move brush radius circle
+function moveCircle(x, y, r, c) {
+  let circle = debug.selectAll('.circle')
+  if (!circle.size())
+    circle = debug.insert('circle', ':first-child').attr('class', 'circle')
+  circle.attr('cx', x).attr('cy', y)
+  if (r) circle.attr('r', r)
+  if (c) circle.attr('stroke', c)
+}
+
 // Get cell info on mouse move (useful for debugging)
 function moved() {
+  console.warn('moved')
   const point = d3.mouse(this)
   const i = diagram.find(point[0], point[1]).index
 
@@ -267,12 +276,11 @@ function moved() {
       infoHeight.innerHTML = getFriendlyHeight(heights[i])
     } else {infoHeight.innerHTML = getFriendlyHeight(p.height)}
     infoFlux.innerHTML = ifDefined(p.flux, 'n/a', 2)
-    let country = p.region === undefined ? 'n/a' : p.region === 'neutral' ? 'neutral' :
-                                                   states[p.region].name + ' (' + p.region + ')'
-    infoCountry.innerHTML = country
-    let culture = ifDefined(p.culture) !== 'no' ?
-                  cultures[p.culture].name + ' (' + p.culture + ')' : 'n/a'
-    infoCulture.innerHTML = culture
+    infoCountry.innerHTML = p.region === undefined ?
+                            'n/a' : p.region === 'neutral' ?
+                                    'neutral' : states[p.region].name + ' (' + p.region + ')'
+    infoCulture.innerHTML = ifDefined(p.culture) === 'no' ? 'n/a' :
+                            cultures[p.culture].name + ' (' + p.culture + ')'
     infoPopulation.innerHTML = ifDefined(p.pop, 'n/a', 2)
     infoBurg.innerHTML =
       ifDefined(p.manor) !== 'no' ? manors[p.manor].name + ' (' + p.manor + ')' : 'no'
@@ -355,9 +363,12 @@ function moved() {
       if (brushId === 'brushHill' || brushId === 'brushPit') {
         radius = Math.pow(brushPower.value * 4, .5)
       }
-    } else if (customization === 2) radius = countriesManuallyBrush.value
-    else if (customization === 4) radius = culturesManuallyBrush.value
-    else if (customization === 5) radius = reliefBulkRemoveRadius.value
+    } else if (customization === 2)
+      radius = countriesManuallyBrush.value
+    else if (customization === 4)
+      radius = culturesManuallyBrush.value
+    else if (customization === 5)
+      radius = reliefBulkRemoveRadius.value
 
     const r = _.round(6 / graphSize * radius, 1)
     let clr = '#373737'
@@ -495,6 +506,8 @@ export default {
     svgWidth: state => state.graphic.svg.width,
     nameBases: state => state.names.nameBases,
     chains: state => state.names.chains,
+    cultures: state => state.cultures.cultures,
+    cultureTree: state => state.cultures.cultureTree,
   }),
   methods: {
     updateLabelGroups() { updateLabelGroups() },
@@ -509,24 +522,27 @@ export default {
         width: +document.getElementById('mapWidthInput').value,
       })
     },
-    resetNames(newState = undefined) {
-      this.$store.commit('names/resetNameBases', {newState})
-    },
-    setNameFields(index, fields) {
-      this.$store.commit('names/setFields', {index, fields})
-    },
-    addLanguage(name, method) {
-      this.$store.commit('names/addLanguage', {name, method})
-    },
-    resetChain(index) {
-      this.$store.commit('names/resetChain', {index})
-    },
-    calculateChain(index) {
-      this.$store.commit('names/calculateChain', {index})
-    },
-    calculateChains() {
-      this.$store.dispatch('names/calculateChains')
-    },
+    ...mapMutations('names', {
+      resetNames: 'resetNameBases',
+      setNameFields: 'setFields',
+      addLanguage: 'addLanguage',
+      resetChain: 'resetChain',
+      calculateChain: 'calculateChain',
+    }),
+    ...mapActions('names', {
+      calculateChains: 'calculateChains',
+    }),
+    ...mapMutations('cultures', {
+      setCultures: 'setCultures',
+      recalculateCultureTree: 'recalculateTree',
+      verifyBases: 'verifyBases',
+    }),
+    ...mapActions('cultures', {
+      generateCultures: 'generate',
+      setCultureCenter: 'setCenter',
+      addCulture: 'add',
+      deleteCulture: 'delete',
+    }),
   },
   components: { Dialogs, Graphic, Options },
   mounted() {
@@ -740,7 +756,7 @@ export default {
       addLakes()
       drawCoastline()
       drawRelief()
-      generateCultures()
+      self.generateCultures()
       manorsAndRegions()
       cleanData()
       console.timeEnd('TOTAL')
@@ -902,15 +918,6 @@ export default {
       polygons = diagram.polygons()
       console.log(' cells: ' + points.length)
       console.timeEnd('calculateVoronoi')
-    }
-
-    // move brush radius circle
-    function moveCircle(x, y, r, c) {
-      let circle = debug.selectAll('.circle')
-      if (!circle.size()) circle = debug.insert('circle', ':first-child').attr('class', 'circle')
-      circle.attr('cx', x).attr('cy', y)
-      if (r) circle.attr('r', r)
-      if (c) circle.attr('stroke', c)
     }
 
     // restore default drag (map panning) and cursor
@@ -2643,7 +2650,7 @@ export default {
         } else {
           // label is not a country name, use random culture
           let c = elSelected.node().getBBox()
-          let culture = Math.floor(Math.random() * cultures.length)
+          let culture = Math.floor(Math.random() * self.cultures.length)
           name = generateName(culture)
         }
         labelText.value = name
@@ -3833,7 +3840,7 @@ export default {
       $('#burgNameReCulture, #burgNameReRandom').click(function() {
         const id = +elSelected.attr('data-id')
         const culture = this.id === 'burgNameReCulture' ? manors[id].culture :
-                        Math.floor(Math.random() * cultures.length)
+                        Math.floor(Math.random() * self.cultures.length)
         const name = generateName(culture)
         burgLabels.selectAll('[data-id=\'' + id + '\']').text(name)
         manors[id].name = name
@@ -4432,20 +4439,6 @@ export default {
       updateCountryEditors()
     }
 
-    // generate cultures for a new map based on options and namesbase
-    function generateCultures() {
-      const count = +culturesInput.value
-      cultures = d3.shuffle(DEFAULT_CULTURES).slice(0, count)
-      const centers = d3.range(cultures.length).map(function(d, i) {
-        const x = Math.floor(Math.random() * self.graphWidth * 0.8 + self.graphWidth * 0.1)
-        const y = Math.floor(Math.random() * self.graphHeight * 0.8 + self.graphHeight * 0.1)
-        const center = [x, y]
-        cultures[i].center = center
-        return center
-      })
-      cultureTree = d3.quadtree(centers)
-    }
-
     function manorsAndRegions() {
       console.group('manorsAndRegions')
       self.calculateChains()
@@ -4606,14 +4599,15 @@ export default {
         }
         if (minDist >= spacing) {
           const cell = land[l].index
-          const closest = cultureTree.find(x, y)
+          const closest = self.cultureTree.find(x, y)
           const culture = getCultureId(closest)
           manors.push({i: region, cell, x, y, region, culture})
         }
         if (l === land.length - 1) {
-          console.error(
-            'Cannot place capitals with current spacing. Trying again with reduced spacing')
-          l = -1, manors = [], spacing /= 1.2
+          console.error('Cannot place capitals with current spacing. Trying again with reduced spacing')
+          l = -1
+          manors = []
+          spacing /= 1.2
         }
       }
 
@@ -4656,7 +4650,7 @@ export default {
           }
         }
         if (closest > neutral / 5 || region === 'neutral') {
-          const closestCulture = cultureTree.find(x, y)
+          const closestCulture = self.cultureTree.find(x, y)
           culture = getCultureId(closestCulture)
         } else {
           culture = manors[region].culture
@@ -5163,12 +5157,12 @@ export default {
     // generate random name using Markov's chain
     function generateName(culture, base) {
       if (base === undefined) {
-        if (!cultures[culture]) {
+        if (!self.cultures[culture]) {
           console.error('culture ' + culture + ' is not defined. Will load default cultures and set first culture')
-          generateCultures()
+          self.generateCultures()
           culture = 0
         }
-        base = cultures[culture].base
+        base = self.cultures[culture].base
       }
       if (!self.nameBases[base]) {
         console.error('self.nameBases ' + base + ' is not defined. Will load default names data and first base')
@@ -5285,7 +5279,7 @@ export default {
         if (dist > neutral / 2 || manor === null) {
           i.region = 'neutral'
           if (withCultures) {
-            const closestCulture = cultureTree.find(x, y)
+            const closestCulture = self.cultureTree.find(x, y)
             i.culture = getCultureId(closestCulture)
           }
         } else {
@@ -5492,7 +5486,7 @@ export default {
       let name = 'NameIdontWant'
       if (Math.random() < 0.85 || culture === null) {
         // culture is random if capital is not yet defined
-        if (culture === null) culture = _.random(cultures.length - 1)
+        if (culture === null) culture = _.random(self.cultures.length - 1)
         // try to avoid too long words as a basename
         for (let i = 0; i < 20 && name.length > 7; i++) {
           name = generateName(culture)
@@ -5500,7 +5494,7 @@ export default {
       } else {
         name = manors[state].name
       }
-      const base = cultures[culture].base
+      const base = self.cultures[culture].base
 
       let addSuffix = false
       // handle special cases
@@ -5574,7 +5568,7 @@ export default {
       states.forEach(function(s) {
         if (s.capital === 'neutral' || s.capital === 'select') return
         const capital = manors[s.capital]
-        const c = cultureTree.find(capital.x, capital.y)
+        const c = self.cultureTree.find(capital.x, capital.y)
         capital.culture = getCultureId(c)
       })
 
@@ -5586,7 +5580,7 @@ export default {
         if (m.region === 'removed') return
         manorTree.add([m.x, m.y])
         if (m.region === 'neutral') {
-          const culture = cultureTree.find(m.x, m.y)
+          const culture = self.cultureTree.find(m.x, m.y)
           m.culture = getCultureId(culture)
           return
         }
@@ -5598,7 +5592,7 @@ export default {
             return
           }
         }
-        const culture = cultureTree.find(m.x, m.y)
+        const culture = self.cultureTree.find(m.x, m.y)
         m.culture = getCultureId(culture)
       })
 
@@ -5612,7 +5606,7 @@ export default {
         const dist = Math.hypot(c[0] - x, c[1] - y)
         let manor = getManorId(c)
         if (dist > neutral / 2 || manor === undefined) {
-          const closestCulture = cultureTree.find(i.data[0], i.data[1])
+          const closestCulture = self.cultureTree.find(i.data[0], i.data[1])
           i.culture = getCultureId(closestCulture)
         } else {
           const cell = manors[manor].cell
@@ -5633,7 +5627,7 @@ export default {
         }
         // re-color cells
         if (i.culture !== culture || fullRedraw) {
-          const clr = cultures[i.culture].color
+          const clr = self.cultures[i.culture].color
           cults.select('#cult' + i.index).attr('fill', clr).attr('stroke', clr)
         }
       })
@@ -5642,8 +5636,9 @@ export default {
 
     // get culture Id from center coordinates
     function getCultureId(c) {
-      for (let i = 0; i < cultures.length; i++) {
-        if (cultures[i].center[0] === c[0]) if (cultures[i].center[1] === c[1]) return i
+      for (let i = 0; i < self.cultures.length; i++) {
+        if (self.cultures[i].center[0] === c[0] && self.cultures[i].center[1] === c[1])
+          return i
       }
     }
 
@@ -5736,7 +5731,7 @@ export default {
     function toggleCultures() {
       if (cults.selectAll('path').size() == 0) {
         land.map(function(i) {
-          const color = cultures[i.culture].color
+          const color = self.cultures[i.culture].color
           cults.append('path')
                .attr('d', 'M' + polygons[i.index].join('L') + 'Z')
                .attr('id', 'cult' + i.index)
@@ -5997,14 +5992,11 @@ export default {
     // Complete the map for the "customize" mode
     function getMap() {
       if (customization !== 1) {
-        tip(
-          'Nothing to complete! Click on "Edit" or "Clear all" to enter a heightmap customization mode',
-          null, 'error')
+        tip('Nothing to complete! Click on "Edit" or "Clear all" to enter a heightmap customization mode', null, 'error')
         return
       }
       if (+landmassCounter.innerHTML < 150) {
-        tip('Insufficient land area! Please add more land cells to complete the map', null,
-          'error')
+        tip('Insufficient land area! Please add more land cells to complete the map', null, 'error')
         return
       }
       exitCustomization()
@@ -6024,7 +6016,7 @@ export default {
       if (keepData) {
         restoreRegions()
       } else {
-        generateCultures()
+        self.generateCultures()
         manorsAndRegions()
       }
       cleanData()
@@ -6056,8 +6048,8 @@ export default {
         const x = _.round(point[0], 2), y = _.round(point[1], 2)
 
         // get culture in clicked point to generate a name
-        const closest = cultureTree.find(x, y)
-        const culture = cultureTree.data().indexOf(closest) || 0
+        const closest = self.find(x, y)
+        const culture = self.cultureTree.data().indexOf(closest) || 0
         const name = generateName(culture)
 
         let group = labels.select('#addedLabels')
@@ -6373,7 +6365,7 @@ export default {
         const c = assigned.attr('data-culture') !== null
                   ? +assigned.attr('data-culture')
                   : cells[index].culture
-        color = cultures[c].color
+        color = self.cultures[c].color
         $('#culture' + c).addClass('selected')
       }
 
@@ -6494,11 +6486,8 @@ export default {
       const svg_xml = (new XMLSerializer()).serializeToString(svg.node())
       const line = '\r\n'
       let data = params + line + JSON.stringify(points) + line + JSON.stringify(cells) + line
-      data += JSON.stringify(manors) + line + JSON.stringify(
-        states) + line + svg_xml + line + options + line
-      data +=
-        JSON.stringify(cultures) + line + '' + line + '' + line + heights + line + JSON.stringify(
-        notes) + line
+      data += JSON.stringify(manors) + line + JSON.stringify(states) + line + svg_xml + line + options + line
+      data += JSON.stringify(self.cultures) + line + '' + line + '' + line + heights + line + JSON.stringify(notes) + line
       const dataBlob = new Blob([data], {type: 'text/plain'})
       const dataURL = window.URL.createObjectURL(dataBlob)
       const link = document.createElement('a')
@@ -6757,30 +6746,23 @@ export default {
 
       // update data
       const newPoints = []
-      riversData = [], queue = [], elSelected = ''
+      riversData = []
+      queue = []
+      elSelected = ''
       points = JSON.parse(data[1])
       cells = JSON.parse(data[2])
       manors = JSON.parse(data[3])
-      if (data[7]) cultures = JSON.parse(data[7])
-      if (data[7] === undefined) generateCultures()
-      if (data[11]) notes = JSON.parse(data[11])
 
-      // place random point
-      function placePoint() {
-        const x = Math.floor(Math.random() * self.graphWidth * 0.8 + self.graphWidth * 0.1)
-        const y = Math.floor(Math.random() * self.graphHeight * 0.8 + self.graphHeight * 0.1)
-        return [x, y]
-      }
+      if (data[7])
+        self.setCultures({cultures: JSON.parse(data[7])})
+      else if (data[7] === undefined)
+        self.generateCultures()
+      self.verifyBases()
 
-      // ensure each culure has a valid namesbase assigned, if not assign first base
-      if (!self.nameBases[0]) self.resetNames()
-      cultures.forEach(function(c) {
-        const b = c.base
-        if (b === undefined) c.base = 0
-        if (!self.nameBases[b]) c.base = 0
-        if (c.center === undefined) c.center = placePoint()
-      })
-      const graphSizeAdj = 90 / Math.sqrt(cells.length, 2) // adjust to different graphSize
+      if (data[11])
+        notes = JSON.parse(data[11])
+
+      const graphSizeAdj = 90 / Math.sqrt(cells.length) // adjust to different graphSize
 
       // cells validations
       cells.forEach(function(c, d) {
@@ -6792,10 +6774,10 @@ export default {
         if (c.height === 1 && c.region !== undefined && c.flux !== undefined) c.height = 100
 
         // check if there are any unavailable cultures
-        if (c.culture > cultures.length - 1) {
+        if (c.culture > self.cultures.length - 1) {
           const center = [c.data[0], c.data[1]]
           const cult = {name: 'AUTO_' + c.culture, color: '#ff0000', base: 0, center}
-          cultures.push(cult)
+          self.cultures.push(cult)
         }
 
         if (c.height >= 20) {
@@ -7136,7 +7118,7 @@ export default {
           data += m.name + ','
           const country = m.region === 'neutral' ? 'neutral' : states[m.region].name
           data += country + ','
-          data += cultures[m.culture].name + ','
+          data += self.cultures[m.culture].name + ','
           const population = m.population * urbanization.value * populationRate.value * 1000
           data += population + '\n'
         })
@@ -8175,8 +8157,8 @@ export default {
           }
         } else {
           // free cell -> create new burg for a capital
-          const closest = cultureTree.find(x, y)
-          const culture = cultureTree.data().indexOf(closest) || 0
+          const closest = self.cultureTree.find(x, y)
+          const culture = self.cultureTree.data().indexOf(closest) || 0
           const name = generateName(culture)
           const i = manors.length
           cells[index].manor = i
@@ -8296,36 +8278,33 @@ export default {
       burgs.map(function(b) {
         $('#burgsBody').append('<div class="states" id="burgs' + b.i + '"></div>')
         const el = $('#burgsBody div:last-child')
-        el.append(
-          '<span title="Click to enlarge the burg" style="padding-right: 2px" class="enlarge icon-globe"></span>')
-        el.append(
-          '<input title="Burg name. Click and type to change" class="burgName" value="' + b.name + '" autocorrect="off" spellcheck="false"/>')
-        el.append(
-          '<span title="Burg culture" class="icon-book" style="padding-right: 2px"></span>')
-        el.append(
-          '<div title="Burg culture" class="burgCulture">' + cultures[b.culture].name + '</div>')
+        el.append('<span title="Click to enlarge the burg" style="padding-right: 2px" class="enlarge icon-globe"></span>')
+        el.append('<input title="Burg name. Click and type to change" class="burgName" value="' + b.name + '" autocorrect="off" spellcheck="false"/>')
+        el.append('<span title="Burg culture" class="icon-book" style="padding-right: 2px"></span>')
+        el.append('<div title="Burg culture" class="burgCulture">' + self.cultures[b.culture].name + '</div>')
         let population = b.population * urbanization.value * populationRate.value * 1000
         populationArray.push(population)
         population = population > 1e4 ? si(population) : _.round(population, -1)
         el.append('<span title="Population" class="icon-male"></span>')
-        el.append(
-          '<input title="Population. Input to change" class="burgPopulation" value="' + population + '"/>')
+        el.append('<input title="Population. Input to change" class="burgPopulation" value="' + population + '"/>')
         const capital = states[s].capital
         let type = 'z-burg' // usual burg by default
         if (b.i === capital) {
           el.append('<span title="Capital" class="icon-star-empty"></span>')
           type = 'c-capital'
-        } else {el.append('<span class="icon-star-empty placeholder"></span>')}
+        } else {
+          el.append('<span class="icon-star-empty placeholder"></span>')
+        }
         if (cells[b.cell].port !== undefined) {
           el.append('<span title="Port" class="icon-anchor small"></span>')
-          if (type === 'c-capital') {type = 'a-capital-port'} else {type = 'p-port'}
+          type = type === 'c-capital' ? 'a-capital-port' : 'p-port'
         } else {
           el.append('<span class="icon-anchor placeholder"></span>')
         }
         if (b.i !== capital) {
           el.append('<span title="Remove burg" class="icon-trash-empty"></span>')
         }
-        el.attr('data-burg', b.name).attr('data-culture', cultures[b.culture].name)
+        el.attr('data-burg', b.name).attr('data-culture', self.cultures[b.culture].name)
           .attr('data-population', b.population).attr('data-type', type)
       })
       if (!$('#burgsEditor').is(':visible')) {
@@ -8342,8 +8321,7 @@ export default {
       // populate total line on footer
       burgsFooterBurgs.innerHTML = burgs.length
       burgsFooterCulture.innerHTML = $('#burgsBody div:first-child .burgCulture').text()
-      const avPop = _.round(d3.mean(populationArray), -1)
-      burgsFooterPopulation.value = avPop
+      burgsFooterPopulation.value = _.round(d3.mean(populationArray), -1)
       $('.enlarge').click(function() {
         const b = +(this.parentNode.id).slice(5)
         const l = labels.select('[data-id=\'' + b + '\']')
@@ -8393,7 +8371,7 @@ export default {
           this.value = si(orig)
           return
         }
-        populationRaw = _.round(pop / urbanization.value / populationRate.value / 1000, 2)
+        const populationRaw = _.round(pop / urbanization.value / populationRate.value / 1000, 2)
         const change = populationRaw - manors[b].population
         manors[b].population = populationRaw
         $(this).parent().attr('data-population', populationRaw)
@@ -8540,7 +8518,7 @@ export default {
       })
 
       if (!self.nameBases[0]) self.resetNames()
-      for (let c = 0; c < cultures.length; c++) {
+      for (let c = 0; c < self.cultures.length; c++) {
         $('#culturesBody').append('<div class="states cultures" id="culture' + c + '"></div>')
         if (cellsC[c] === undefined) {
           cellsC[c] = 0
@@ -8555,12 +8533,12 @@ export default {
         const population = (urban + rural) * 1000
         const populationConv = si(population)
         const title = '\'Total population: ' + populationConv + '; Rural population: ' + rural + 'K; Urban population: ' + urban + 'K\''
-        let b = cultures[c].base
+        let b = self.cultures[c].base
         if (b >= self.nameBases.length) b = 0
         const base = self.nameBases[b].name
         const el = $('#culturesBody div:last-child')
-        el.append('<input onmouseover="tip(\'Culture color. Click to change\')" class="stateColor" type="color" value="' + cultures[c].color + '"/>')
-        el.append('<input onmouseover="tip(\'Culture name. Click and type to change\')" class="cultureName" value="' + cultures[c].name + '" autocorrect="off" spellcheck="false"/>')
+        el.append('<input onmouseover="tip(\'Culture color. Click to change\')" class="stateColor" type="color" value="' + self.cultures[c].color + '"/>')
+        el.append('<input onmouseover="tip(\'Culture name. Click and type to change\')" class="cultureName" value="' + self.cultures[c].name + '" autocorrect="off" spellcheck="false"/>')
         el.append('<span onmouseover="tip(\'Culture cells count\')" class="icon-check-empty"></span>')
         el.append('<div onmouseover="tip(\'Culture cells count\')" class="stateCells">' + cellsC[c] + '</div>')
         el.append('<span onmouseover="tip(\'Culture area: ' + areaConv + '\')" style="padding-right: 4px" class="icon-map-o"></span>')
@@ -8569,10 +8547,10 @@ export default {
         el.append('<div onmouseover="tip(' + title + ')" class="culturePopulation">' + populationConv + '</div>')
         el.append('<span onmouseover="tip(\'Click to re-generate names for burgs with this culture assigned\')" class="icon-arrows-cw"></span>')
         el.append('<select onmouseover="tip(\'Culture namesbase. Click to change\')" class="cultureBase"></select>')
-        if (cultures.length > 1) {
+        if (self.cultures.length > 1) {
           el.append('<span onmouseover="tip(\'Remove culture. Remaining cultures will be recalculated\')" class="icon-trash-empty"></span>')
         }
-        el.attr('data-color', cultures[c].color).attr('data-culture', cultures[c].name)
+        el.attr('data-color', self.cultures[c].color).attr('data-culture', self.cultures[c].name)
           .attr('data-cells', cellsC[c]).attr('data-area', area).attr('data-population', population)
           .attr('data-base', base)
       }
@@ -8581,7 +8559,7 @@ export default {
       drawCultureCenters()
 
       let activeCultures = cellsC.reduce(function(s, v) {if (v) {return s + 1} else {return s}}, 0)
-      culturesFooterCultures.innerHTML = activeCultures + '/' + cultures.length
+      culturesFooterCultures.innerHTML = activeCultures + '/' + self.cultures.length
       culturesFooterCells.innerHTML = land.length
       let totalArea = areas.reduce(function(s, v) {return s + v})
       totalArea = Math.round(totalArea * Math.pow(distanceScale.value, 2))
@@ -8616,21 +8594,21 @@ export default {
         const c = +(this.id).slice(7)
         $('.selected').removeClass('selected')
         $(this).addClass('selected')
-        let color = cultures[c].color
+        let color = self.cultures[c].color
         debug.selectAll('.circle').attr('stroke', color)
       })
 
       $('.cultures .stateColor').on('input', function() {
         const c = +(this.parentNode.id).slice(7)
-        const old = cultures[c].color
-        cultures[c].color = this.value
+        const old = self.cultures[c].color
+        self.setCultureFields(c, {color: this.value})
         debug.select('#cultureCenter' + c).attr('fill', this.value)
         cults.selectAll('[fill="' + old + '"]').attr('fill', this.value).attr('stroke', this.value)
       })
 
       $('.cultures .cultureName').on('input', function() {
         const c = +(this.parentNode.id).slice(7)
-        cultures[c].name = this.value
+        self.setCultureFields(c, {name: this.value})
       })
 
       $('.cultures .icon-arrows-cw').on('click', function() {
@@ -8645,8 +8623,7 @@ export default {
 
       $('#culturesBody .icon-trash-empty').on('click', function() {
         const c = +(this.parentNode.id).slice(7)
-        cultures.splice(c, 1)
-        cultureTree = d3.quadtree(cultures.map(function(c) {return c.center}))
+        self.deleteCulture(c)
         recalculateCultures('fullRedraw')
         editCultures()
       })
@@ -8660,9 +8637,9 @@ export default {
           for (let i = 0; i < self.nameBases.length; i++) {
             this.options.add(new Option(self.nameBases[i].name, i))
           }
-          this.value = cultures[c].base
+          this.value = self.cultures[c].base
           this.addEventListener('change', function() {
-            cultures[c].base = +this.value
+            self.setCultureFields(c, {base: +this.value})
           })
         })
       }
@@ -8672,11 +8649,11 @@ export default {
         if (cultureCenters.size()) {cultureCenters.selectAll('*').remove()} else {
           cultureCenters = debug.append('g').attr('id', 'cultureCenters')
         }
-        for (let c = 0; c < cultures.length; c++) {
+        for (let c = 0; c < self.cultures.length; c++) {
           cultureCenters.append('circle').attr('id', 'cultureCenter' + c)
-                        .attr('cx', cultures[c].center[0]).attr('cy', cultures[c].center[1])
+                        .attr('cx', self.cultures[c].center[0]).attr('cy', self.cultures[c].center[1])
                         .attr('r', 6).attr('stroke-width', 2).attr('stroke', '#00000080')
-                        .attr('fill', cultures[c].color)
+                        .attr('fill', self.cultures[c].color)
                         .on('mousemove', cultureCenterTip)
                         .on('mouseleave', function() {tip('', true)})
                         .call(d3.drag().on('start', cultureCenterDrag))
@@ -8692,10 +8669,10 @@ export default {
         const c = +this.id.slice(13)
 
         d3.event.on('drag', function() {
-          const x = d3.event.x, y = d3.event.y
+          const x = d3.event.x
+          const y = d3.event.y
           el.attr('cx', x).attr('cy', y)
-          cultures[c].center = [x, y]
-          cultureTree = d3.quadtree(cultures.map(function(c) {return c.center}))
+          self.setCultureCenter({index: c, x, y})
           recalculateCultures()
         })
       }
@@ -8750,7 +8727,7 @@ export default {
           const i = +(this.id).slice(4)
           const c = cells[i].culture
           this.removeAttribute('data-culture')
-          const color = cultures[c].color
+          const color = self.cultures[c].color
           this.setAttribute('fill', color)
           this.setAttribute('stroke', color)
         })
@@ -8768,14 +8745,7 @@ export default {
       }
 
       $('#culturesRandomize').on('click', function() {
-        const centers = cultures.map(function(c) {
-          const x = Math.floor(Math.random() * self.graphWidth * 0.8 + self.graphWidth * 0.1)
-          const y = Math.floor(Math.random() * self.graphHeight * 0.8 + self.graphHeight * 0.1)
-          const center = [x, y]
-          c.center = center
-          return center
-        })
-        cultureTree = d3.quadtree(centers)
+        self.recalculateCultureTree()
         recalculateCultures()
         drawCultureCenters()
         editCultures()
@@ -8814,26 +8784,7 @@ export default {
       $('#culturesEditNamesBase').on('click', editNamesbase)
 
       $('#culturesAdd').on('click', function() {
-        const x = Math.floor(Math.random() * self.graphWidth * 0.8 + self.graphWidth * 0.1)
-        const y = Math.floor(Math.random() * self.graphHeight * 0.8 + self.graphHeight * 0.1)
-        const center = [x, y]
-
-        let culture, base, name, color
-        if (cultures.length < DEFAULT_CULTURES.length) {
-          // add one of the default cultures
-          culture = cultures.length
-          base = DEFAULT_CULTURES[culture].base
-          color = DEFAULT_CULTURES[culture].color
-          name = DEFAULT_CULTURES[culture].name
-        } else {
-          // add random culture besed on one of the current ones
-          culture = _.random(cultures.length - 1)
-          name = generateName(culture)
-          color = colors20(cultures.length % 20)
-          base = cultures[culture].base
-        }
-        cultures.push({name, color, base, center})
-        cultureTree = d3.quadtree(cultures.map(function(c) {return c.center}))
+        self.addCulture({generateName})
         recalculateCultures()
         editCultures()
       })
@@ -8905,53 +8856,53 @@ export default {
       })
 
       $('#namesbaseName').on('input', function() {
-        const base = +textarea.getAttribute('data-base')
+        const index = +textarea.getAttribute('data-base')
         const select = document.getElementById('namesbaseSelect')
-        select.options[base].innerHTML = this.value
-        self.setNameFields(base, {name: this.value})
+        select.options[index].innerHTML = this.value
+        self.setNameFields({index, fields: {name: this.value}})
       })
 
       $('#namesbaseTextarea').on('input', function() {
-        const base = +this.getAttribute('data-base')
+        const index = +this.getAttribute('data-base')
         const data = textarea.value.replace(/ /g, '').split(',')
-        self.setNameFields(base, {names: data})
+        self.setNameFields({index, fields: {names: data}})
         if (data.length < 3) {
-          self.resetChain(base)
+          self.resetChain({index})
           const examples = document.getElementById('namesbaseExamples')
           examples.innerHTML = 'Please provide a correct source data'
           return
         }
         const method = document.getElementById('namesbaseMethod').value
-        if (method !== 'selection') self.calculateChain(base)
+        if (method !== 'selection') self.calculateChain({index})
       })
 
       $('#namesbaseMethod').on('change', function() {
-        const base = +textarea.getAttribute('data-base')
-        self.setNameFields(base, {method: this.value})
-        if (this.value !== 'selection') self.calculateChain(base)
+        const index = +textarea.getAttribute('data-base')
+        self.setNameFields({index, fields: {method: this.value}})
+        if (this.value !== 'selection')
+          self.calculateChain({index})
       })
 
       $('#namesbaseMin').on('change', function() {
-        const base = +textarea.getAttribute('data-base')
-        if (+this.value > self.nameBases[base].max) {
+        const index = +textarea.getAttribute('data-base')
+        if (+this.value > self.nameBases[index].max) {
           tip('Minimal length cannot be greated that maximal')
         } else {
-          self.setNameFields(base, {min: +this.value})
+          self.setNameFields({index, fields: {min: +this.value}})
         }
       })
 
       $('#namesbaseMax').on('change', function() {
-        const base = +textarea.getAttribute('data-base')
-        if (+this.value < self.nameBases[base].min) {
+        const index = +textarea.getAttribute('data-base')
+        if (+this.value < self.nameBases[index].min) {
           tip('Maximal length cannot be less than minimal')
         } else {
-          self.setNameFields(base, {max: +this.value})
+          self.setNameFields({index, fields: {max: +this.value}})
         }
       })
 
       $('#namesbaseDouble').on('change', function() {
-        const base = +textarea.getAttribute('data-base')
-        self.setNameFields(base, {d: this.value})
+        self.setNameFields({index: +textarea.getAttribute('data-base'), fields: {d: this.value}})
       })
 
       $('#namesbaseDefault').on('click', function() {
@@ -8970,8 +8921,7 @@ export default {
               document.getElementById('namesbaseTextarea').setAttribute('data-base', 0)
               document.getElementById('namesbaseExamples').innerHTML === ''
               self.resetNames()
-              const baseMax = self.nameBases.length - 1
-              cultures.forEach(function(c) {if (c.base > baseMax) c.base = baseMax})
+              self.verifyBases()
               self.calculateChains()
               editCultures()
               editNamesbase()
@@ -8988,13 +8938,13 @@ export default {
         const select = document.getElementById('namesbaseSelect')
         select.options.add(new Option(name, base))
         select.value = base
-        self.addLanguage(name, method)
+        self.addLanguage({name, method})
         document.getElementById('namesbaseName').value = name
         const textarea = document.getElementById('namesbaseTextarea')
         textarea.value = ''
         textarea.setAttribute('data-base', base)
         document.getElementById('namesbaseExamples').innerHTML = ''
-        self.resetChain(base)
+        self.resetChain({index: base})
         editCultures()
       })
 
@@ -9023,8 +8973,7 @@ export default {
           document.getElementById('namesbaseTextarea').value = ''
           document.getElementById('namesbaseTextarea').setAttribute('data-base', 0)
           document.getElementById('namesbaseExamples').innerHTML === ''
-          const baseMax = self.nameBases.length - 1
-          cultures.forEach(function(c) {if (c.base > baseMax) c.base = baseMax})
+          self.verifyBases()
           self.calculateChains()
           editCultures()
           editNamesbase()

@@ -37,7 +37,7 @@ export default {
   namespaced: true,
   state: initialState(),
   mutations: {
-    resetNameBases(state, {newState = [...DEFAULT_NAMES_BASES]}) {
+    resetNameBases(state, newState = [...DEFAULT_NAMES_BASES]) {
       state.nameBases = [...newState]
     },
     setFields(state, {index, fields}) {

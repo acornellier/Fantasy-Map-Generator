@@ -29,6 +29,17 @@ export default {
     deleteCulture(state, {index}) {
       state.cultures = state.cultures.splice(index, 1)
     },
+    setFields(state, {index, fields}) {
+      Vue.set(state.cultures, index, {...state.cultures[index], ...fields})
+    },
+    verifyBases(state, _payload, rootState) {
+      const nameBaseMax = rootState.names.nameBases.length - 1
+      state.cultures = state.cultures.map(culture => {
+        if (culture.base > nameBaseMax)
+          culture.base = nameBaseMax
+        return culture
+      })
+    },
   },
   actions: {
     generate({commit, rootState}) {
@@ -42,7 +53,7 @@ export default {
       commit('setCenter', {index, x, y})
       commit('recalculateTree')
     },
-    addCulture({commit, state, rootState}, generateName) {
+    add({commit, state, rootState}, {generateName}) {
       let culture, base, name, color
       if (state.cultures.length < DEFAULT_CULTURES.length) {
         // add one of the default cultures
@@ -60,7 +71,7 @@ export default {
       state.cultures.push({name, color, base, center: randomCenter(rootState.graphic.graph)})
       commit('recalculateTree')
     },
-    deleteCulture({commit}, {index}) {
+    delete({commit}, {index}) {
       commit('deleteCulture', {index})
       commit('recalculateTree')
     },

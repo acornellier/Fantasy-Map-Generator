@@ -3,6 +3,7 @@ import Vuex from 'vuex'
 import createLogger from 'vuex/dist/logger'
 import graphic from './modules/graphic'
 import names from './modules/names'
+import cultures from './modules/cultures'
 
 Vue.use(Vuex)
 
@@ -12,6 +13,7 @@ export default new Vuex.Store({
   modules: {
     graphic,
     names,
+    cultures,
   },
   strict: debug,
   plugins: debug ? [createLogger()] : []
