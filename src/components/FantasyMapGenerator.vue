@@ -39,6 +39,7 @@
 <script>
 /* eslint-disable */
 import {mapState, mapMutations, mapActions} from 'vuex'
+import {mapFields} from 'vuex-map-fields'
 import seedrandom from 'seedrandom'
 import * as d3 from 'd3'
 import * as d3chromatic from 'd3-scale-chromatic'
@@ -151,18 +152,6 @@ function saveAsImage(type) {
       this.setAttribute('width', size + 'px')
       this.setAttribute('height', size + 'px')
     })
-
-    // clean attributes
-    //clone.selectAll("*").each(function() {
-    //  const attributes = this.attributes;
-    //  for (let i = 0; i < attributes.length; i++) {
-    //    const attr = attributes[i];
-    //    if (attr.value === "" || attr.name.includes("data")) {
-    //      this.removeAttribute(attr.name);
-    //    }
-    //  }
-    //});
-
   }
 
   // for each g element get inline style
@@ -261,7 +250,6 @@ function moveCircle(x, y, r, c) {
 
 // Get cell info on mouse move (useful for debugging)
 function moved() {
-  console.warn('moved')
   const point = d3.mouse(this)
   const i = diagram.find(point[0], point[1]).index
 
@@ -499,16 +487,16 @@ function toggleHeight() {
 
 export default {
   name: 'FantasyMapGenerator',
-  computed: mapState({
-    graphHeight: state => state.graphic.graph.height,
-    graphWidth: state => state.graphic.graph.width,
-    svgHeight: state => state.graphic.svg.height,
-    svgWidth: state => state.graphic.svg.width,
-    nameBases: state => state.names.nameBases,
-    chains: state => state.names.chains,
-    cultures: state => state.cultures.cultures,
-    cultureTree: state => state.cultures.cultureTree,
-  }),
+  computed: {
+    ...mapFields('cultures', ['cultures', 'cultureTree']),
+    ...mapFields('names', ['nameBases', 'chains']),
+    ...mapState({
+      graphHeight: state=> state.graphic.graph.height,
+      graphWidth: state => state.graphic.graph.width,
+      svgHeight: state => state.graphic.svg.height,
+      svgWidth: state => state.graphic.svg.width,
+    }),
+  },
   methods: {
     updateLabelGroups() { updateLabelGroups() },
     applyDefaultStyle() { applyDefaultStyle() },
@@ -548,7 +536,7 @@ export default {
   mounted() {
     const self = this
     const version = '0.60b'
-    document.title += ' v. ' + version
+    document.title += ' ' + version
 
     svg = d3.select('svg')
     defs = svg.select('#deftemp')

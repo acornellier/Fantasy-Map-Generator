@@ -1,4 +1,5 @@
 import Vue from 'vue'
+import {getField} from 'vuex-map-fields'
 import * as d3 from 'd3'
 import * as _ from 'lodash'
 import {DEFAULT_CULTURES} from '../../constants'
@@ -15,6 +16,9 @@ export default {
   state: {
     cultures: [],
     tree: d3.quadtree(),
+  },
+  getters: {
+    getField,
   },
   mutations: {
     setCultures(state, {cultures}) {
