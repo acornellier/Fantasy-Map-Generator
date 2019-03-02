@@ -52,6 +52,7 @@ import 'jquery-ui-bundle/jquery-ui.css'
 import * as _ from 'lodash'
 import {color, colors8, colors20, toHEX, round, si, getInteger, GFontToDataURI, ifDefined} from '../utils'
 import {ICONS, FONTS, VOWELS} from '../constants'
+import {DEFAULT_GLOBAL_STATE} from '../store/modules/global'
 import Dialogs from './dialogs/Dialogs.vue'
 import Graphic from './Graphic.vue'
 import Options from './options/Options.vue'
@@ -89,29 +90,8 @@ let burgIcons
 let markers
 let ruler
 let debug
-let seed
-let params
+
 let voronoi
-let diagram
-let polygons
-let spacing
-let points = []
-let heights
-let modules = []
-let customization = 0
-let history = []
-let historyStage = 0
-let elSelected
-let autoResize = true
-let graphSize
-let cells = []
-let land = []
-let riversData = []
-let manors = []
-let states = []
-let features = []
-let notes = []
-let queue = []
 
 // download map as SVG or PNG file
 function saveAsImage(type) {
@@ -251,28 +231,28 @@ function moveCircle(x, y, r, c) {
 // Get cell info on mouse move (useful for debugging)
 function moved() {
   const point = d3.mouse(this)
-  const i = diagram.find(point[0], point[1]).index
+  const i = self.diagram.find(point[0], point[1]).index
 
   // update cellInfo
   if (i) {
-    const p = cells[i] // get cell
+    const p = self.cells[i] // get cell
     infoX.innerHTML = Math.round(point[0])
     infoY.innerHTML = Math.round(point[1])
     infoCell.innerHTML = i
     infoArea.innerHTML = ifDefined(p.area, 'n/a', 2)
-    if (customization === 1) {
-      infoHeight.innerHTML = getFriendlyHeight(heights[i])
+    if (self.customization === 1) {
+      infoHeight.innerHTML = getFriendlyHeight(self.heights[i])
     } else {infoHeight.innerHTML = getFriendlyHeight(p.height)}
     infoFlux.innerHTML = ifDefined(p.flux, 'n/a', 2)
     infoCountry.innerHTML = p.region === undefined ?
                             'n/a' : p.region === 'neutral' ?
-                                    'neutral' : states[p.region].name + ' (' + p.region + ')'
+                                    'neutral' : self.states[p.region].name + ' (' + p.region + ')'
     infoCulture.innerHTML = ifDefined(p.culture) === 'no' ? 'n/a' :
                             cultures[p.culture].name + ' (' + p.culture + ')'
     infoPopulation.innerHTML = ifDefined(p.pop, 'n/a', 2)
     infoBurg.innerHTML =
-      ifDefined(p.manor) !== 'no' ? manors[p.manor].name + ' (' + p.manor + ')' : 'no'
-    const feature = features[p.fn]
+      ifDefined(p.manor) !== 'no' ? self.manors[p.manor].name + ' (' + p.manor + ')' : 'no'
+    const feature = self.features[p.fn]
     if (feature !== undefined) {
       const fType = feature.land ? 'Island' : feature.border ? 'Ocean' : 'Lake'
       infoFeature.innerHTML = fType + ' (' + p.fn + ')'
@@ -307,7 +287,7 @@ function moved() {
     if (id === '') id = event.target.parentNode.id
     if (subgroup === 'burgLabels') id = 'burg' + event.target.getAttribute('data-id')
 
-    let note = notes.find(note => note.id === id)
+    let note = self.notes.find(note => note.id === id)
     let legend = document.getElementById('legend')
     let legendHeader = document.getElementById('legendHeader')
     let legendBody = document.getElementById('legendBody')
@@ -323,7 +303,7 @@ function moved() {
   }
 
   // draw line for ranges placing for heightmap Customization
-  if (customization === 1) {
+  if (self.customization === 1) {
     const line = debug.selectAll('.line')
     if (debug.selectAll('.tag').size() === 1) {
       const x = +debug.select('.tag').attr('cx')
@@ -340,31 +320,31 @@ function moved() {
   }
 
   // change radius circle for Customization
-  if (customization > 0) {
+  if (self.customization > 0) {
     const brush = $('#brushesButtons > .pressed')
     const brushId = brush.attr('id')
     if (brushId === 'brushRange' || brushId === 'brushTrough') return
-    if (customization !== 5 && !brush.length && !$('div.selected').length) return
+    if (self.customization !== 5 && !brush.length && !$('div.selected').length) return
     let radius = 0
-    if (customization === 1) {
+    if (self.customization === 1) {
       radius = brushRadius.value
       if (brushId === 'brushHill' || brushId === 'brushPit') {
         radius = Math.pow(brushPower.value * 4, .5)
       }
-    } else if (customization === 2)
+    } else if (self.customization === 2)
       radius = countriesManuallyBrush.value
-    else if (customization === 4)
+    else if (self.customization === 4)
       radius = culturesManuallyBrush.value
-    else if (customization === 5)
+    else if (self.customization === 5)
       radius = reliefBulkRemoveRadius.value
 
-    const r = _.round(6 / graphSize * radius, 1)
+    const r = _.round(6 / self.graphSize * radius, 1)
     let clr = '#373737'
-    if (customization === 2) {
+    if (self.customization === 2) {
       const state = +$('div.selected').attr('id').slice(5)
-      clr = states[state].color === 'neutral' ? 'white' : states[state].color
+      clr = self.states[state].color === 'neutral' ? 'white' : self.states[state].color
     }
-    if (customization === 4) {
+    if (self.customization === 4) {
       const culture = +$('div.selected').attr('id').slice(7)
       clr = cultures[culture].color
     }
@@ -464,7 +444,7 @@ function toggleHeight() {
   if (scheme === 'green') hColor = d3.scaleSequential(d3chromatic.interpolateGreens)
   if (scheme === 'monochrome') hColor = d3.scaleSequential(d3chromatic.interpolateGreys)
   if (!terrs.selectAll('path').size()) {
-    cells.map(function(i, d) {
+    self.cells.map(function(i, d) {
       let height = i.height
       if (height < 20 && !i.lake) return
       if (i.lake) {
@@ -477,7 +457,7 @@ function toggleHeight() {
       }
       const clr = hColor((100 - height) / 100)
       terrs.append('path')
-           .attr('d', 'M' + polygons[d].join('L') + 'Z')
+           .attr('d', 'M' + self.polygons[d].join('L') + 'Z')
            .attr('fill', clr).attr('stroke', clr)
     })
   } else {
@@ -489,6 +469,7 @@ export default {
   name: 'FantasyMapGenerator',
   computed: {
     ...mapFields('cultures', ['cultures', 'cultureTree']),
+    ...mapFields('global', Object.keys(DEFAULT_GLOBAL_STATE)),
     ...mapFields('names', ['nameBases', 'chains']),
     ...mapState({
       graphHeight: state=> state.graphic.graph.height,
@@ -510,6 +491,11 @@ export default {
         width: +document.getElementById('mapWidthInput').value,
       })
     },
+    ...mapMutations('global', [
+      'placePoints',
+      'calculateVoronoi',
+      'detectNeighbors',
+    ]),
     ...mapMutations('names', {
       resetNames: 'resetNameBases',
       setNameFields: 'setFields',
@@ -730,7 +716,7 @@ export default {
       applyMapSize()
       randomizeOptions()
       placePoints()
-      calculateVoronoi(points)
+      calculateVoronoi(self.points)
       detectNeighbors()
       drawScaleBar()
       defineHeightmap()
@@ -754,19 +740,19 @@ export default {
     // get or generate map seed
     function getSeed() {
       const url = new URL(window.location.href)
-      params = url.searchParams
-      seed = params.get('seed') || Math.floor(Math.random() * 1e9)
-      console.log(' seed: ' + seed)
-      $('#optionsSeed').value = seed
-      seedrandom(seed)
+      self.params = url.searchParams
+      self.seed = self.params.get('seed') || Math.floor(Math.random() * 1e9)
+      console.log(' seed: ' + self.seed)
+      $('#optionsSeed').value = self.seed
+      seedrandom(self.seed)
     }
 
     // generate new map seed
     function changeSeed() {
-      seed = Math.floor(Math.random() * 1e9)
-      console.log(' seed: ' + seed)
-      $('#optionsSeed').value = seed
-      seedrandom(seed)
+      self.seed = Math.floor(Math.random() * 1e9)
+      console.log(' seed: ' + self.seed)
+      $('#optionsSeed').value = self.seed
+      seedrandom(self.seed)
     }
 
     // load options from LocalStorage is any
@@ -779,10 +765,10 @@ export default {
         mapHeightInput.value = window.innerHeight
       }
       if (localStorage.getItem('graphSize')) {
-        graphSize = localStorage.getItem('graphSize')
-        sizeInput.value = sizeOutput.value = graphSize
+        self.graphSize = localStorage.getItem('graphSize')
+        sizeInput.value = sizeOutput.value = self.graphSize
       } else {
-        graphSize = +sizeInput.value
+        self.graphSize = +sizeInput.value
       }
       if (localStorage.getItem('template')) {
         templateInput.value = localStorage.getItem('template')
@@ -844,7 +830,7 @@ export default {
       mapWidthInput.value = window.innerWidth
       mapHeightInput.value = window.innerHeight
       changeMapSize()
-      graphSize = sizeInput.value = sizeOutput.value = 1
+      self.graphSize = sizeInput.value = sizeOutput.value = 1
       $('#options i[class^=\'icon-lock\']').each(function() {
         this.setAttribute('data-locked', 0)
         this.className = 'icon-lock-open'
@@ -887,23 +873,14 @@ export default {
     // Locate points to calculate Voronoi diagram
     function placePoints() {
       console.time('placePoints')
-      points = getJitteredGrid()
-      heights = new Uint8Array(points.length)
+      self.placePoints({height: self.graphHeight, width: self.graphWidth})
       console.timeEnd('placePoints')
     }
 
     // Calculate Voronoi Diagram
     function calculateVoronoi(points) {
       console.time('calculateVoronoi')
-      diagram = voronoi(points)
-      // round edges to simplify future calculations
-      diagram.edges.forEach(function(e) {
-        e[0][0] = _.round(e[0][0], 2)
-        e[0][1] = _.round(e[0][1], 2)
-        e[1][0] = _.round(e[1][0], 2)
-        e[1][1] = _.round(e[1][1], 2)
-      })
-      polygons = diagram.polygons()
+      self.calculateVoronoi({voronoi, points})
       console.log(' cells: ' + points.length)
       console.timeEnd('calculateVoronoi')
     }
@@ -922,15 +899,15 @@ export default {
     function defineBrushSelection(center, r) {
       let radius = r
       let selection = [center]
-      if (radius > 1) selection = selection.concat(cells[center].neighbors)
-      selection = $.grep(selection, function(e) {return cells[e].height >= 20})
+      if (radius > 1) selection = selection.concat(self.cells[center].neighbors)
+      selection = $.grep(selection, function(e) {return self.cells[e].height >= 20})
       if (radius === 2) return selection
-      let frontier = cells[center].neighbors
+      let frontier = self.cells[center].neighbors
       while (radius > 2) {
         let cycle = frontier.slice()
         frontier = []
         cycle.map(function(s) {
-          cells[s].neighbors.forEach(function(e) {
+          self.cells[s].neighbors.forEach(function(e) {
             if (selection.indexOf(e) !== -1) return
             // if (cells[e].height < 20) return;
             selection.push(e)
@@ -939,7 +916,7 @@ export default {
         })
         radius--
       }
-      selection = $.grep(selection, function(e) {return cells[e].height >= 20})
+      selection = $.grep(selection, function(e) {return self.cells[e].height >= 20})
       return selection
     }
 
@@ -964,24 +941,7 @@ export default {
     // turn D3 polygons array into cell array, define neighbors for each cell
     function detectNeighbors(withGrid) {
       console.time('detectNeighbors')
-      let gridPath = '' // store grid as huge single path string
-      cells = []
-      polygons.map(function(i, d) {
-        const neighbors = []
-        let type // define cell type
-        if (withGrid) {gridPath += 'M' + i.join('L') + 'Z'} // grid path
-        diagram.cells[d].halfedges.forEach(function(e) {
-          const edge = diagram.edges[e]
-          if (edge.left && edge.right) {
-            const ea = edge.left.index === d ? edge.right.index : edge.left.index
-            neighbors.push(ea)
-          } else {
-            type = 'border' // polygon is on border if it has edge without opposite side polygon
-          }
-        })
-        cells.push({index: d, data: i.data, height: 0, type, neighbors})
-      })
-      if (withGrid) {grid.append('path').attr('d', round(gridPath, 1))}
+      self.detectNeighbors({grid})
       console.timeEnd('detectNeighbors')
     }
 
@@ -1118,7 +1078,7 @@ export default {
     function addMountain() {
       const x = Math.floor(Math.random() * self.graphWidth / 3 + self.graphWidth / 3)
       const y = Math.floor(Math.random() * self.graphHeight * 0.2 + self.graphHeight * 0.4)
-      const cell = diagram.find(x, y).index
+      const cell = self.diagram.find(x, y).index
       const height = Math.random() * 10 + 90 // 90-99
       add(cell, 'mountain', height)
     }
@@ -1131,9 +1091,9 @@ export default {
           height = Math.random() * 40 + 10 // 10-50
           const x = Math.floor(Math.random() * self.graphWidth * (1 - shift * 2) + self.graphWidth * shift)
           const y = Math.floor(Math.random() * self.graphHeight * (1 - shift * 2) + self.graphHeight * shift)
-          cell = diagram.find(x, y).index
+          cell = self.diagram.find(x, y).index
           limit++
-        } while (heights[cell] + height > 90 && limit < 100)
+        } while (self.heights[cell] + height > 90 && limit < 100)
         add(cell, 'hill', height)
       }
     }
@@ -1143,7 +1103,7 @@ export default {
       let radius
       let hRadius
       let mRadius
-      switch (+graphSize) {
+      switch (+self.graphSize) {
         case 1:
           hRadius = 0.991
           mRadius = 0.91
@@ -1163,17 +1123,17 @@ export default {
       }
       radius = type === 'mountain' ? mRadius : hRadius
       const queue = [start]
-      if (type === 'mountain') heights[start] = height
+      if (type === 'mountain') self.heights[start] = height
       for (let i = 0; i < queue.length && height >= 1; i++) {
         if (type === 'mountain') {
-          height = heights[queue[i]] * radius - height / 100
+          height = self.heights[queue[i]] * radius - height / 100
         } else {height *= radius}
-        cells[queue[i]].neighbors.forEach(function(e) {
-          if (cells[e].used === session) return
+        self.cells[queue[i]].neighbors.forEach(function(e) {
+          if (self.cells[e].used === session) return
           const mod = Math.random() * 0.2 + 0.9 // 0.9-1.1 random factor
-          heights[e] += height * mod
-          if (heights[e] > 100) heights[e] = 100
-          cells[e].used = session
+          self.heights[e] += height * mod
+          if (self.heights[e] > 100) self.heights[e] = 100
+          self.cells[e].used = session
           queue.push(e)
         })
       }
@@ -1190,19 +1150,19 @@ export default {
           do {
             const xf = Math.floor(Math.random() * (self.graphWidth * 0.7)) + self.graphWidth * 0.15
             const yf = Math.floor(Math.random() * (self.graphHeight * 0.6)) + self.graphHeight * 0.2
-            start = diagram.find(xf, yf).index
+            start = self.diagram.find(xf, yf).index
             const xt = Math.floor(Math.random() * (self.graphWidth * 0.7)) + self.graphWidth * 0.15
             const yt = Math.floor(Math.random() * (self.graphHeight * 0.6)) + self.graphHeight * 0.2
-            end = diagram.find(xt, yt).index
+            end = self.diagram.find(xt, yt).index
             diff = Math.hypot(xt - xf, yt - yf)
-          } while (diff < 150 / graphSize || diff > 300 / graphSize)
+          } while (diff < 150 / self.graphSize || diff > 300 / self.graphSize)
         }
         if (start && end) {
           for (let l = 0; start != end && l < 10000; l++) {
             let min = 10000
-            cells[start].neighbors.forEach(function(e) {
-              diff = Math.hypot(cells[end].data[0] - cells[e].data[0],
-                cells[end].data[1] - cells[e].data[1])
+            self.cells[start].neighbors.forEach(function(e) {
+              diff = Math.hypot(self.cells[end].data[0] - self.cells[e].data[0],
+                self.cells[end].data[1] - self.cells[e].data[1])
               if (Math.random() > 0.8) diff = diff / 2
               if (diff < min) {min = diff, start = e}
             })
@@ -1212,17 +1172,17 @@ export default {
         const change = height ? height : Math.random() * 10 + 10
         range.map(function(r) {
           let rnd = Math.random() * 0.4 + 0.8
-          if (mod > 0) heights[r] += change * rnd
-          else if (heights[r] >= 10) {heights[r] -= change * rnd}
-          cells[r].neighbors.forEach(function(e) {
-            if (cells[e].used === session) return
-            cells[e].used = session
+          if (mod > 0) self.heights[r] += change * rnd
+          else if (self.heights[r] >= 10) {self.heights[r] -= change * rnd}
+          self.cells[r].neighbors.forEach(function(e) {
+            if (self.cells[e].used === session) return
+            self.cells[e].used = session
             rnd = Math.random() * 0.4 + 0.8
             const ch = change / 2 * rnd
-            if (mod > 0) {heights[e] += ch} else if (heights[e] >= 10) {heights[e] -= ch}
-            if (heights[e] > 100) heights[e] = mod > 0 ? 100 : 5
+            if (mod > 0) {self.heights[e] += ch} else if (self.heights[e] >= 10) {self.heights[e] -= ch}
+            if (self.heights[e] > 100) self.heights[e] = mod > 0 ? 100 : 5
           })
-          if (heights[r] > 100) heights[r] = mod > 0 ? 100 : 5
+          if (self.heights[r] > 100) self.heights[r] = mod > 0 ? 100 : 5
         })
       }
       return range
@@ -1233,14 +1193,14 @@ export default {
       const top = Math.floor(Math.random() * self.graphWidth * 0.35 + self.graphWidth * 0.3)
       const bottom = Math.floor(
         (self.graphWidth - top) - (self.graphWidth * 0.1) + (Math.random() * self.graphWidth * 0.2))
-      let start = diagram.find(top, self.graphHeight * 0.1).index
-      const end = diagram.find(bottom, self.graphHeight * 0.9).index
+      let start = self.diagram.find(top, self.graphHeight * 0.1).index
+      const end = self.diagram.find(bottom, self.graphHeight * 0.9).index
       let range = []
       for (let l = 0; start !== end && l < 1000; l++) {
         let min = 10000 // dummy value
-        cells[start].neighbors.forEach(function(e) {
-          let diff = Math.hypot(cells[end].data[0] - cells[e].data[0],
-            cells[end].data[1] - cells[e].data[1])
+        self.cells[start].neighbors.forEach(function(e) {
+          let diff = Math.hypot(self.cells[end].data[0] - self.cells[e].data[0],
+            self.cells[end].data[1] - self.cells[e].data[1])
           if (Math.random() > 0.8) {diff = diff / 2}
           if (diff < min) {
             min = diff
@@ -1252,12 +1212,12 @@ export default {
       const query = []
       for (; width > 0; width--) {
         range.map(function(r) {
-          cells[r].neighbors.forEach(function(e) {
-            if (cells[e].used === session) {return}
-            cells[e].used = session
+          self.cells[r].neighbors.forEach(function(e) {
+            if (self.cells[e].used === session) {return}
+            self.cells[e].used = session
             query.push(e)
-            heights[e] *= 0.23
-            if (heights[e] > 100 || heights[e] < 5) heights[e] = 5
+            self.heights[e] *= 0.23
+            if (self.heights[e] > 100 || self.heights[e] < 5) self.heights[e] = 5
           })
           range = query.slice()
         })
@@ -1270,28 +1230,28 @@ export default {
         let change = height ? height + 10 : Math.random() * 10 + 20
         let start = cell
         if (!start) {
-          const lowlands = $.grep(cells, function(e) {return (heights[e.index] >= 20)})
+          const lowlands = $.grep(self.cells, function(e) {return (self.heights[e.index] >= 20)})
           if (!lowlands.length) return
           const rnd = Math.floor(Math.random() * lowlands.length)
           start = lowlands[rnd].index
         }
         let query = [start], newQuery = []
         // depress pit center
-        heights[start] -= change
-        if (heights[start] < 5 || heights[start] > 100) heights[start] = 5
-        cells[start].used = session
+        self.heights[start] -= change
+        if (self.heights[start] < 5 || self.heights[start] > 100) self.heights[start] = 5
+        self.cells[start].used = session
         for (let i = 1; i < 10000; i++) {
           const rnd = Math.random() * 0.4 + 0.8
           change -= i / 0.6 * rnd
           if (change < 1) break
           query.map(function(p) {
-            cells[p].neighbors.forEach(function(e) {
-              if (cells[e].used === session) return
-              cells[e].used = session
+            self.cells[p].neighbors.forEach(function(e) {
+              if (self.cells[e].used === session) return
+              self.cells[e].used = session
               if (Math.random() > 0.8) return
               newQuery.push(e)
-              heights[e] -= change
-              if (heights[e] < 5 || heights[e] > 100) heights[e] = 5
+              self.heights[e] -= change
+              if (self.heights[e] < 5 || self.heights[e] > 100) self.heights[e] = 5
             })
           })
           query = newQuery.slice()
@@ -1317,67 +1277,67 @@ export default {
       const limMin = range === 'land' ? 20 : range === 'all' ? 0 : +range.split('-')[0]
       const limMax = range === 'land' || range === 'all' ? 100 : +range.split('-')[1]
 
-      for (let i = 0; i < heights.length; i++) {
-        if (heights[i] < limMin || heights[i] > limMax) continue
-        heights[i] = modify(heights[i])
+      for (let i = 0; i < self.heights.length; i++) {
+        if (self.heights[i] < limMin || self.heights[i] > limMax) continue
+        self.heights[i] = modify(self.heights[i])
       }
     }
 
     // Smooth heights using mean of neighbors
     function smoothHeights(fraction) {
       const fr = fraction || 2
-      for (let i = 0; i < heights.length; i++) {
-        const nHeights = [heights[i]]
-        cells[i].neighbors.forEach(function(e) {nHeights.push(heights[e])})
-        heights[i] = (heights[i] * (fr - 1) + d3.mean(nHeights)) / fr
+      for (let i = 0; i < self.heights.length; i++) {
+        const nHeights = [self.heights[i]]
+        self.cells[i].neighbors.forEach(function(e) {nHeights.push(self.heights[e])})
+        self.heights[i] = (self.heights[i] * (fr - 1) + d3.mean(nHeights)) / fr
       }
     }
 
     // Randomize heights a bit
     function disruptHeights() {
-      for (let i = 0; i < heights.length; i++) {
-        if (heights[i] < 18) continue
+      for (let i = 0; i < self.heights.length; i++) {
+        if (self.heights[i] < 18) continue
         if (Math.random() < 0.5) continue
-        heights[i] += 2 - Math.random() * 4
+        self.heights[i] += 2 - Math.random() * 4
       }
     }
 
     // Mark features (ocean, lakes, islands)
     function markFeatures() {
       console.time('markFeatures')
-      seedrandom(seed) // reset seed to get the same result on heightmap edit
+      seedrandom(self.seed) // reset seed to get the same result on heightmap edit
       for (let i = 0, queue = [0]; queue.length > 0; i++) {
-        const cell = cells[queue[0]]
+        const cell = self.cells[queue[0]]
         cell.fn = i // feature number
-        const land = heights[queue[0]] >= 20
+        const land = self.heights[queue[0]] >= 20
         let border = cell.type === 'border'
         if (border && land) cell.ctype = 2
 
         while (queue.length) {
           const q = queue.pop()
-          if (cells[q].type === 'border') {
+          if (self.cells[q].type === 'border') {
             border = true
-            if (land) cells[q].ctype = 2
+            if (self.land) self.cells[q].ctype = 2
           }
 
-          cells[q].neighbors.forEach(function(e) {
-            const eLand = heights[e] >= 20
-            if (land === eLand && cells[e].fn === undefined) {
-              cells[e].fn = i
+          self.cells[q].neighbors.forEach(function(e) {
+            const eLand = self.heights[e] >= 20
+            if (self.land === eLand && self.cells[e].fn === undefined) {
+              self.cells[e].fn = i
               queue.push(e)
             }
-            if (land && !eLand) {
-              cells[q].ctype = 2
-              cells[e].ctype = -1
-              cells[q].harbor = cells[q].harbor ? cells[q].harbor + 1 : 1
+            if (self.land && !eLand) {
+              self.cells[q].ctype = 2
+              self.cells[e].ctype = -1
+              self.cells[q].harbor = self.cells[q].harbor ? self.cells[q].harbor + 1 : 1
             }
           })
         }
-        features.push({i, land, border})
+        self.features.push({i, land, border})
 
         // find unmarked cell
-        for (let c = 0; c < cells.length; c++) {
-          if (cells[c].fn === undefined) {
+        for (let c = 0; c < self.cells.length; c++) {
+          if (self.cells[c].fn === undefined) {
             queue[0] = c
             break
           }
@@ -1391,7 +1351,7 @@ export default {
       let limits = []
       let odd = 0.8 // initial odd for ocean layer is 80%
       // Define type of ocean cells based on cell distance form land
-      let frontier = $.grep(cells, function(e) {return e.ctype === -1})
+      let frontier = $.grep(self.cells, function(e) {return e.ctype === -1})
       if (Math.random() < odd) {
         limits.push(-1)
         odd = 0.2
@@ -1403,10 +1363,10 @@ export default {
         } else {odd += 0.2}
         frontier.map(function(i) {
           i.neighbors.forEach(function(e) {
-            if (!cells[e].ctype) cells[e].ctype = c
+            if (!self.cells[e].ctype) self.cells[e].ctype = c
           })
         })
-        frontier = $.grep(cells, function(e) {return e.ctype === c})
+        frontier = $.grep(self.cells, function(e) {return e.ctype === c})
       }
       if (outlineLayersInput.value === 'none') return
       if (outlineLayersInput.value !== 'random') limits = outlineLayersInput.value.split(',')
@@ -1415,17 +1375,17 @@ export default {
       for (let l = 0; l < limits.length; l++) {
         const edges = []
         const lim = +limits[l]
-        for (let i = 0; i < cells.length; i++) {
-          if (cells[i].ctype < lim || cells[i].ctype === undefined) continue
-          if (cells[i].ctype > lim && cells[i].type !== 'border') continue
-          const cell = diagram.cells[i]
+        for (let i = 0; i < self.cells.length; i++) {
+          if (self.cells[i].ctype < lim || self.cells[i].ctype === undefined) continue
+          if (self.cells[i].ctype > lim && self.cells[i].type !== 'border') continue
+          const cell = self.diagram.cells[i]
           cell.halfedges.forEach(function(e) {
-            const edge = diagram.edges[e]
+            const edge = self.diagram.edges[e]
             const start = edge[0].join(' ')
             const end = edge[1].join(' ')
             if (edge.left && edge.right) {
               const ea = edge.left.index === i ? edge.right.index : edge.left.index
-              if (cells[ea].ctype < lim) edges.push({start, end})
+              if (self.cells[ea].ctype < lim) edges.push({start, end})
             } else {
               edges.push({start, end})
             }
@@ -1451,8 +1411,8 @@ export default {
       const smallLakesMax = 500
       let smallLakes = 0
       const evaporation = 2
-      cells.map(function(i, d) {
-        let height = i.height || heights[d]
+      self.cells.map(function(i, d) {
+        let height = i.height || self.heights[d]
         if (height > 100) height = 100
         const pit = i.pit
         const ctype = i.ctype
@@ -1487,12 +1447,11 @@ export default {
         // add additional points for cells along coast
         if (ctype === 2 || ctype === -1) {
           if (i.type === 'border') return
-          if (!features[fn].land && !features[fn].border) return
+          if (!self.features[fn].land && !self.features[fn].border) return
           i.neighbors.forEach(function(e) {
-            if (cells[e].ctype === ctype) {
-              let x1 = (x * 2 + cells[e].data[0]) / 3
-              let y1 = (y * 2 + cells[e].data[1]) / 3
-              x1 = _.round(x1, 1), y1 = _.round(y1, 1)
+            if (self.cells[e].ctype === ctype) {
+              let x1 = _.round((x * 2 + self.cells[e].data[0]) / 3, 1)
+              let y1 = _.round((y * 2 + self.cells[e].data[1]) / 3, 1)
               copy = $.grep(newPoints, function(e) {return e[0] === x1 && e[1] === y1})
               if (copy.length) return
               newPoints.push([x1, y1])
@@ -1512,7 +1471,7 @@ export default {
           })
         }
         if (lake === 2) { // add potential small lakes
-          polygons[i.index].forEach(function(e) {
+          self.polygons[i.index].forEach(function(e) {
             if (Math.random() > 0.8) return
             let rnd = Math.random() * 0.6 + 0.8
             const x1 = _.round((e[0] * rnd + i.data[0]) / (1 + rnd), 2)
@@ -1527,26 +1486,26 @@ export default {
         }
       })
       console.log('small lakes candidates: ' + smallLakes)
-      cells = tempCells // use tempCells as the only cells array
+      self.cells = tempCells // use tempCells as the only cells array
       calculateVoronoi(newPoints) // recalculate Voronoi diagram using new points
       let gridPath = '' // store grid as huge single path string
-      cells.map(function(i, d) {
+      self.cells.map(function(i, d) {
         if (i.height >= 20) {
           // calc cell area
-          i.area = _.round(Math.abs(d3.polygonArea(polygons[d])), 2)
+          i.area = _.round(Math.abs(d3.polygonArea(self.polygons[d])), 2)
           const prec = _.round(avPrec * i.area, 2)
           i.flux = i.lake ? prec * 10 : prec
         }
         const neighbors = [] // re-detect neighbors
-        diagram.cells[d].halfedges.forEach(function(e) {
-          const edge = diagram.edges[e]
+        self.diagram.cells[d].halfedges.forEach(function(e) {
+          const edge = self.diagram.edges[e]
           if (edge.left === undefined || edge.right === undefined) {
             if (i.height >= 20) i.ctype = 99 // border cell
             return
           }
           const ea = edge.left.index === d ? edge.right.index : edge.left.index
           neighbors.push(ea)
-          if (d < ea && i.height >= 20 && i.lake !== 1 && cells[ea].height >= 20 && cells[ea].lake !== 1) {
+          if (d < ea && i.height >= 20 && i.lake !== 1 && self.cells[ea].height >= 20 && self.cells[ea].lake !== 1) {
             gridPath += 'M' + edge[0][0] + ',' + edge[0][1] + 'L' + edge[1][0] + ',' + edge[1][1]
           }
         })
@@ -1563,12 +1522,12 @@ export default {
       let landCells = 0
       $('#landmass').empty()
       const limit = renderOcean.checked ? 1 : 20
-      for (let i = 0; i < heights.length; i++) {
-        if (heights[i] < limit) continue
-        if (heights[i] > 100) heights[i] = 100
-        const clr = color(1 - heights[i] / 100)
+      for (let i = 0; i < self.heights.length; i++) {
+        if (self.heights[i] < limit) continue
+        if (self.heights[i] > 100) self.heights[i] = 100
+        const clr = color(1 - self.heights[i] / 100)
         landmass.append('path').attr('id', 'cell' + i)
-                .attr('d', 'M' + polygons[i].join('L') + 'Z')
+                .attr('d', 'M' + self.polygons[i].join('L') + 'Z')
                 .attr('fill', clr).attr('stroke', clr)
       }
     }
@@ -1578,17 +1537,17 @@ export default {
     // draw or update all cells
     function updateHeightmap() {
       const limit = renderOcean.checked ? 1 : 20
-      for (let i = 0; i < heights.length; i++) {
-        if (heights[i] > 100) heights[i] = 100
+      for (let i = 0; i < self.heights.length; i++) {
+        if (self.heights[i] > 100) self.heights[i] = 100
         let cell = landmass.select('#cell' + i)
-        const clr = color(1 - heights[i] / 100)
+        const clr = color(1 - self.heights[i] / 100)
         if (cell.size()) {
-          if (heights[i] < limit) {cell.remove()} else {
+          if (self.heights[i] < limit) {cell.remove()} else {
             cell.attr('fill', clr).attr('stroke', clr)
           }
-        } else if (heights[i] >= limit) {
+        } else if (self.heights[i] >= limit) {
           cell = landmass.append('path').attr('id', 'cell' + i)
-                         .attr('d', 'M' + polygons[i].join('L') + 'Z')
+                         .attr('d', 'M' + self.polygons[i].join('L') + 'Z')
                          .attr('fill', clr).attr('stroke', clr)
         }
       }
@@ -1599,16 +1558,16 @@ export default {
       if (selection === undefined) return
       const limit = renderOcean.checked ? 1 : 20
       selection.map(function(s) {
-        if (heights[s] > 100) heights[s] = 100
+        if (self.heights[s] > 100) self.heights[s] = 100
         let cell = landmass.select('#cell' + s)
-        const clr = color(1 - heights[s] / 100)
+        const clr = color(1 - self.heights[s] / 100)
         if (cell.size()) {
-          if (heights[s] < limit) {cell.remove()} else {
+          if (self.heights[s] < limit) {cell.remove()} else {
             cell.attr('fill', clr).attr('stroke', clr)
           }
-        } else if (heights[s] >= limit) {
+        } else if (self.heights[s] >= limit) {
           cell = landmass.append('path').attr('id', 'cell' + s)
-                         .attr('d', 'M' + polygons[s].join('L') + 'Z')
+                         .attr('d', 'M' + self.polygons[s].join('L') + 'Z')
                          .attr('fill', clr).attr('stroke', clr)
         }
       })
@@ -1618,17 +1577,17 @@ export default {
       let landCells = 0 // count number of land cells
       if (renderOcean.checked) {
         landCells =
-          heights.reduce(function(s, v) {if (v >= 20) {return s + 1} else {return s}}, 0)
+          self.heights.reduce(function(s, v) {if (v >= 20) {return s + 1} else {return s}}, 0)
       } else {
         landCells = landmass.selectAll('*').size()
       }
-      history = history.slice(0, historyStage)
-      history[historyStage] = heights.slice()
-      historyStage++
-      undo.disabled = templateUndo.disabled = historyStage <= 1
+      self.history = self.history.slice(0, self.historyStage)
+      self.history[self.historyStage] = self.heights.slice()
+      self.historyStage++
+      undo.disabled = templateUndo.disabled = self.historyStage <= 1
       redo.disabled = templateRedo.disabled = true
-      const landMean = Math.trunc(d3.mean(heights))
-      const landRatio = _.round(landCells / heights.length * 100)
+      const landMean = Math.trunc(d3.mean(self.heights))
+      const landRatio = _.round(landCells / self.heights.length * 100)
       landmassCounter.innerHTML = landCells
       landmassRatio.innerHTML = landRatio
       landmassAverage.innerHTML = landMean
@@ -1638,18 +1597,18 @@ export default {
 
     // restoreHistory
     function restoreHistory(step) {
-      historyStage = step
-      redo.disabled = templateRedo.disabled = historyStage >= history.length
-      undo.disabled = templateUndo.disabled = historyStage <= 1
-      if (history[historyStage - 1] === undefined) return
-      heights = history[historyStage - 1].slice()
+      self.historyStage = step
+      redo.disabled = templateRedo.disabled = self.historyStage >= self.history.length
+      undo.disabled = templateUndo.disabled = self.historyStage <= 1
+      if (self.history[self.historyStage - 1] === undefined) return
+      self.heights = self.history[self.historyStage - 1].slice()
       updateHeightmap()
     }
 
     // restart history from 1st step
     function restartHistory() {
-      history = []
-      historyStage = 0
+      self.history = []
+      self.historyStage = 0
       redo.disabled = templateRedo.disabled = true
       undo.disabled = templateUndo.disabled = true
       updateHistory()
@@ -1658,42 +1617,42 @@ export default {
     // Detect and draw the coasline
     function drawCoastline() {
       console.time('drawCoastline')
-      seedrandom(seed) // reset seed to get the same result on heightmap edit
+      seedrandom(self.seed) // reset seed to get the same result on heightmap edit
       const shape = defs.append('mask').attr('id', 'shape').attr('fill', 'black').attr('x', 0)
                         .attr('y', 0).attr('width', '100%').attr('height', '100%')
       $('#landmass').empty()
       let minX = self.graphWidth, maxX = 0 // extreme points
       let minXedge, maxXedge // extreme edges
       const oceanEdges = [], lakeEdges = []
-      for (let i = 0; i < land.length; i++) {
-        const id = land[i].index, cell = diagram.cells[id]
-        const f = land[i].fn
-        land[i].height = Math.trunc(land[i].height)
+      for (let i = 0; i < self.land.length; i++) {
+        const id = self.land[i].index, cell = self.diagram.cells[id]
+        const f = self.land[i].fn
+        self.land[i].height = Math.trunc(self.land[i].height)
         if (!oceanEdges[f]) {
           oceanEdges[f] = []
           lakeEdges[f] = []
         }
         cell.halfedges.forEach(function(e) {
-          const edge = diagram.edges[e]
+          const edge = self.diagram.edges[e]
           const start = edge[0].join(' ')
           const end = edge[1].join(' ')
           if (edge.left && edge.right) {
             const ea = edge.left.index === id ? edge.right.index : edge.left.index
-            cells[ea].height = Math.trunc(cells[ea].height)
-            if (cells[ea].height < 20) {
-              cells[ea].ctype = -1
-              if (land[i].ctype !== 1) {
-                land[i].ctype = 1 // mark coastal land cells
+            self.cells[ea].height = Math.trunc(self.cells[ea].height)
+            if (self.cells[ea].height < 20) {
+              self.cells[ea].ctype = -1
+              if (self.land[i].ctype !== 1) {
+                self.land[i].ctype = 1 // mark coastal land cells
                 // move cell point closer to coast
-                const x = (land[i].data[0] + cells[ea].data[0]) / 2
-                const y = (land[i].data[1] + cells[ea].data[1]) / 2
-                land[i].haven = ea // harbor haven (oposite water cell)
-                land[i].coastX = _.round(x + (land[i].data[0] - x) * 0.1, 1)
-                land[i].coastY = _.round(y + (land[i].data[1] - y) * 0.1, 1)
-                land[i].data[0] = _.round(x + (land[i].data[0] - x) * 0.5, 1)
-                land[i].data[1] = _.round(y + (land[i].data[1] - y) * 0.5, 1)
+                const x = (self.land[i].data[0] + self.cells[ea].data[0]) / 2
+                const y = (self.land[i].data[1] + self.cells[ea].data[1]) / 2
+                self.land[i].haven = ea // harbor haven (oposite water cell)
+                self.land[i].coastX = _.round(x + (self.land[i].data[0] - x) * 0.1, 1)
+                self.land[i].coastY = _.round(y + (self.land[i].data[1] - y) * 0.1, 1)
+                self.land[i].data[0] = _.round(x + (self.land[i].data[0] - x) * 0.5, 1)
+                self.land[i].data[1] = _.round(y + (self.land[i].data[1] - y) * 0.5, 1)
               }
-              if (features[cells[ea].fn].border) {
+              if (self.features[self.cells[ea].fn].border) {
                 oceanEdges[f].push({start, end})
                 // island extreme points
                 if (edge[0][0] < minX) {
@@ -1713,7 +1672,7 @@ export default {
                   maxXedge = edge[1]
                 }
               } else {
-                const l = cells[ea].fn
+                const l = self.cells[ea].fn
                 if (!lakeEdges[f][l]) lakeEdges[f][l] = []
                 lakeEdges[f][l].push({start, end})
               }
@@ -1724,7 +1683,7 @@ export default {
         })
       }
 
-      for (let f = 0; f < features.length; f++) {
+      for (let f = 0; f < self.features.length; f++) {
         if (!oceanEdges[f]) continue
         if (!oceanEdges[f].length && lakeEdges[f].length) {
           const m = lakeEdges[f].indexOf(d3.max(lakeEdges[f]))
@@ -2060,18 +2019,18 @@ export default {
     // temporary elevate lakes to min neighbors heights to correctly flux the water
     function elevateLakes() {
       console.time('elevateLakes')
-      const lakes = $.grep(cells,
-        function(e, d) {return heights[d] < 20 && !features[e.fn].border})
-      lakes.sort(function(a, b) {return heights[b.index] - heights[a.index]})
+      const lakes = $.grep(self.cells,
+        function(e, d) {return self.heights[d] < 20 && !self.features[e.fn].border})
+      lakes.sort(function(a, b) {return self.heights[b.index] - self.heights[a.index]})
       for (let i = 0; i < lakes.length; i++) {
         const hs = [], id = lakes[i].index
-        cells[id].height = heights[id] // use height on object level
+        self.cells[id].height = self.heights[id] // use height on object level
         lakes[i].neighbors.forEach(function(n) {
-          const nHeight = cells[n].height || heights[n]
+          const nHeight = self.cells[n].height || self.heights[n]
           if (nHeight >= 20) hs.push(nHeight)
         })
-        if (hs.length) cells[id].height = d3.min(hs) - 1
-        if (cells[id].height < 20) cells[id].height = 20
+        if (hs.length) self.cells[id].height = d3.min(hs) - 1
+        if (self.cells[id].height < 20) self.cells[id].height = 20
         lakes[i].lake = 1
       }
       console.timeEnd('elevateLakes')
@@ -2080,23 +2039,23 @@ export default {
     // Depression filling algorithm (for a correct water flux modeling; phase1)
     function resolveDepressionsPrimary() {
       console.time('resolveDepressionsPrimary')
-      land = $.grep(cells, function(e, d) {
-        if (!e.height) e.height = heights[d] // use height on object level
+      self.land = $.grep(self.cells, function(e, d) {
+        if (!e.height) e.height = self.heights[d] // use height on object level
         return e.height >= 20
       })
-      land.sort(function(a, b) {return b.height - a.height})
+      self.land.sort(function(a, b) {return b.height - a.height})
       const limit = 10
       for (let l = 0, depression = 1; depression > 0 && l < limit; l++) {
         depression = 0
-        for (let i = 0; i < land.length; i++) {
-          const id = land[i].index
-          if (land[i].type === 'border') continue
-          const hs = land[i].neighbors.map(function(n) {return cells[n].height})
+        for (let i = 0; i < self.land.length; i++) {
+          const id = self.land[i].index
+          if (self.land[i].type === 'border') continue
+          const hs = self.land[i].neighbors.map(function(n) {return self.cells[n].height})
           const minHigh = d3.min(hs)
-          if (cells[id].height <= minHigh) {
+          if (self.cells[id].height <= minHigh) {
             depression++
-            land[i].pit = land[i].pit ? land[i].pit + 1 : 1
-            cells[id].height = minHigh + 2
+            self.land[i].pit = self.land[i].pit ? self.land[i].pit + 1 : 1
+            self.cells[id].height = minHigh + 2
           }
         }
         if (l === 0) console.log(' depressions init: ' + depression)
@@ -2107,19 +2066,19 @@ export default {
     // Depression filling algorithm (for a correct water flux modeling; phase2)
     function resolveDepressionsSecondary() {
       console.time('resolveDepressionsSecondary')
-      land = $.grep(cells, function(e) {return e.height >= 20})
-      land.sort(function(a, b) {return b.height - a.height})
+      self.land = $.grep(self.cells, function(e) {return e.height >= 20})
+      self.land.sort(function(a, b) {return b.height - a.height})
       const limit = 100
       for (let l = 0, depression = 1; depression > 0 && l < limit; l++) {
         depression = 0
-        for (let i = 0; i < land.length; i++) {
-          if (land[i].ctype === 99) continue
-          const nHeights = land[i].neighbors.map(function(n) {return cells[n].height})
-          const minHigh = d3.min(nHeights)
-          if (land[i].height <= minHigh) {
+        for (let i = 0; i < self.land.length; i++) {
+          if (self.land[i].ctype === 99) continue
+          const heights = self.land[i].neighbors.map(function(n) {return self.cells[n].height})
+          const minHigh = d3.min(heights)
+          if (self.land[i].height <= minHigh) {
             depression++
-            land[i].pit = land[i].pit ? land[i].pit + 1 : 1
-            land[i].height = Math.trunc(minHigh + 2)
+            self.land[i].pit = self.land[i].pit ? self.land[i].pit + 1 : 1
+            self.land[i].height = Math.trunc(minHigh + 2)
           }
         }
         if (l === 0) console.log(' depressions reGraphed: ' + depression)
@@ -2130,7 +2089,7 @@ export default {
 
     // restore initial heights if user don't want system to change heightmap
     function restoreCustomHeights() {
-      land.forEach(function(l) {
+      self.land.forEach(function(l) {
         if (!l.pit) return
         l.height = Math.trunc(l.height - l.pit * 2)
         if (l.height < 20) l.height = 20
@@ -2139,16 +2098,16 @@ export default {
 
     function flux() {
       console.time('flux')
-      riversData = []
+      self.riversData = []
       let riverNext = 0
-      land.sort(function(a, b) {return b.height - a.height})
-      for (let i = 0; i < land.length; i++) {
-        const id = land[i].index
-        const sx = land[i].data[0]
-        const sy = land[i].data[1]
-        let fn = land[i].fn
-        if (land[i].ctype === 99) {
-          if (land[i].river !== undefined) {
+      self.land.sort(function(a, b) {return b.height - a.height})
+      for (let i = 0; i < self.land.length; i++) {
+        const id = self.land[i].index
+        const sx = self.land[i].data[0]
+        const sy = self.land[i].data[1]
+        let fn = self.land[i].fn
+        if (self.land[i].ctype === 99) {
+          if (self.land[i].river !== undefined) {
             let x, y
             const min = Math.min(sy, self.graphHeight - sy, sx, self.graphWidth - sx)
             if (min === sy) {
@@ -2167,76 +2126,76 @@ export default {
               x = self.graphWidth
               y = sy
             }
-            riversData.push({river: land[i].river, cell: id, x, y})
+            self.riversData.push({river: self.land[i].river, cell: id, x, y})
           }
           continue
         }
-        if (features[fn].river !== undefined) {
-          if (land[i].river !== features[fn].river) {
-            land[i].river = undefined
-            land[i].flux = 0
+        if (self.features[fn].river !== undefined) {
+          if (self.land[i].river !== self.features[fn].river) {
+            self.land[i].river = undefined
+            self.land[i].flux = 0
           }
         }
         let minHeight = 1000, min
-        land[i].neighbors.forEach(function(e) {
-          if (cells[e].height < minHeight) {
-            minHeight = cells[e].height
+        self.land[i].neighbors.forEach(function(e) {
+          if (self.cells[e].height < minHeight) {
+            minHeight = self.cells[e].height
             min = e
           }
         })
         // Define river number
-        if (min !== undefined && land[i].flux > 1) {
-          if (land[i].river === undefined) {
+        if (min !== undefined && self.land[i].flux > 1) {
+          if (self.land[i].river === undefined) {
             // State new River
-            land[i].river = riverNext
-            riversData.push({river: riverNext, cell: id, x: sx, y: sy})
+            self.land[i].river = riverNext
+            self.riversData.push({river: riverNext, cell: id, x: sx, y: sy})
             riverNext += 1
           }
           // Assing existing River to the downhill cell
-          if (cells[min].river == undefined) {
-            cells[min].river = land[i].river
+          if (self.cells[min].river == undefined) {
+            self.cells[min].river = self.land[i].river
           } else {
-            const riverTo = cells[min].river
-            const iRiver = $.grep(riversData, function(e) {
-              return (e.river == land[i].river)
+            const riverTo = self.cells[min].river
+            const iRiver = $.grep(self.riversData, function(e) {
+              return (e.river == self.land[i].river)
             })
-            const minRiver = $.grep(riversData, function(e) {
+            const minRiver = $.grep(self.riversData, function(e) {
               return (e.river == riverTo)
             })
             let iRiverL = iRiver.length
             let minRiverL = minRiver.length
             // re-assing river nunber if new part is greater
             if (iRiverL >= minRiverL) {
-              cells[min].river = land[i].river
+              self.cells[min].river = self.land[i].river
               iRiverL += 1
               minRiverL -= 1
             }
             // mark confluences
-            if (cells[min].height >= 20 && iRiverL > 1 && minRiverL > 1) {
-              if (!cells[min].confluence) {
-                cells[min].confluence = minRiverL - 1
+            if (self.cells[min].height >= 20 && iRiverL > 1 && minRiverL > 1) {
+              if (!self.cells[min].confluence) {
+                self.cells[min].confluence = minRiverL - 1
               } else {
-                cells[min].confluence += minRiverL - 1
+                self.cells[min].confluence += minRiverL - 1
               }
             }
           }
         }
-        if (cells[min].flux) cells[min].flux += land[i].flux
-        if (land[i].river !== undefined) {
-          const px = cells[min].data[0]
-          const py = cells[min].data[1]
-          if (cells[min].height < 20) {
+        if (self.cells[min].flux) self.cells[min].flux += self.land[i].flux
+        if (self.land[i].river !== undefined) {
+          const px = self.cells[min].data[0]
+          const py = self.cells[min].data[1]
+          if (self.cells[min].height < 20) {
             // pour water to the sea
             const x = (px + sx) / 2 + (px - sx) / 10
             const y = (py + sy) / 2 + (py - sy) / 10
-            riversData.push({river: land[i].river, cell: id, x, y})
+            self.riversData.push({river: self.land[i].river, cell: id, x, y})
           } else {
-            if (cells[min].lake === 1) {
-              fn = cells[min].fn
-              if (features[fn].river === undefined) features[fn].river = land[i].river
+            if (self.cells[min].lake === 1) {
+              fn = self.cells[min].fn
+              if (self.features[fn].river === undefined) self.features[fn].river = self.land[i].river
             }
             // add next River segment
-            riversData.push({river: land[i].river, cell: min, x: px, y: py})
+            self.riversData.push({river: self.land[i].river, cell: min, x: px, y: py})
           }
         }
       }
@@ -2247,7 +2206,7 @@ export default {
     function drawRiverLines(riverNext) {
       console.time('drawRiverLines')
       for (let i = 0; i < riverNext; i++) {
-        const dataRiver = $.grep(riversData, function(e) {
+        const dataRiver = $.grep(self.riversData, function(e) {
           return e.river === i
         })
         if (dataRiver.length > 1) {
@@ -2271,7 +2230,7 @@ export default {
         const dX = dataRiver[r].x
         const dY = dataRiver[r].y
         const cell = dataRiver[r].cell
-        const c = cells[cell].confluence || 0
+        const c = self.cells[cell].confluence || 0
         riverAmended.push([dX, dY, c])
         if (r + 1 < dataRiver.length) {
           const eX = dataRiver[r + 1].x
@@ -2322,7 +2281,8 @@ export default {
         riverLength += Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1])
       })
       const widening = Math.round((1000 + (riverLength * 30)) * increment)
-      const riverPointsLeft = [], riverPointsRight = []
+      const riverPointsLeft = []
+      const riverPointsRight = []
       const last = points.length - 1
       const factor = riverLength / points.length
 
@@ -2376,7 +2336,8 @@ export default {
       const river = defs.append('path').attr('d', lineGen(riverPoints))
       const riverLength = river.node().getTotalLength()
       const widening = Math.round((1000 + (riverLength * 30)) * increment)
-      const riverPointsLeft = [], riverPointsRight = []
+      const riverPointsLeft = []
+      const riverPointsRight = []
 
       for (let l = 0; l < riverLength; l++) {
         var point = river.node().getPointAtLength(l)
@@ -2415,30 +2376,30 @@ export default {
     function addLakes() {
       console.time('addLakes')
       let smallLakes = 0
-      for (let i = 0; i < land.length; i++) {
+      for (let i = 0; i < self.land.length; i++) {
         // elavate all big lakes
-        if (land[i].lake === 1) {
-          land[i].height = 19
-          land[i].ctype = -1
+        if (self.land[i].lake === 1) {
+          self.land[i].height = 19
+          self.land[i].ctype = -1
         }
         // define eligible small lakes
-        if (land[i].lake === 2 && smallLakes < 100) {
-          if (land[i].river !== undefined) {
-            land[i].height = 19
-            land[i].ctype = -1
-            land[i].fn = -1
+        if (self.land[i].lake === 2 && smallLakes < 100) {
+          if (self.land[i].river !== undefined) {
+            self.land[i].height = 19
+            self.land[i].ctype = -1
+            self.land[i].fn = -1
             smallLakes++
           } else {
-            land[i].lake = undefined
-            land[i].neighbors.forEach(function(n) {
-              if (cells[n].lake !== 1 && cells[n].river !== undefined) {
-                cells[n].lake = 2
-                cells[n].height = 19
-                cells[n].ctype = -1
-                cells[n].fn = -1
+            self.land[i].lake = undefined
+            self.land[i].neighbors.forEach(function(n) {
+              if (self.cells[n].lake !== 1 && self.cells[n].river !== undefined) {
+                self.cells[n].lake = 2
+                self.cells[n].height = 19
+                self.cells[n].ctype = -1
+                self.cells[n].fn = -1
                 smallLakes++
-              } else if (cells[n].lake === 2) {
-                cells[n].lake = undefined
+              } else if (self.cells[n].lake === 2) {
+                self.cells[n].lake = undefined
               }
             })
           }
@@ -2447,39 +2408,41 @@ export default {
       console.log('small lakes: ' + smallLakes)
 
       // mark small lakes
-      let unmarked = $.grep(land, function(e) {return e.fn === -1})
+      let unmarked = $.grep(self.land, function(e) {return e.fn === -1})
       while (unmarked.length) {
-        let fn = -1, queue = [unmarked[0].index], lakeCells = []
+        let fn = -1
+        let queue = [unmarked[0].index]
+        let lakeCells = []
         unmarked[0].session = 'addLakes'
         while (queue.length) {
           const q = queue.pop()
           lakeCells.push(q)
-          if (cells[q].fn !== -1) fn = cells[q].fn
-          cells[q].neighbors.forEach(function(e) {
-            if (cells[e].lake && cells[e].session !== 'addLakes') {
-              cells[e].session = 'addLakes'
+          if (self.cells[q].fn !== -1) fn = self.cells[q].fn
+          self.cells[q].neighbors.forEach(function(e) {
+            if (self.cells[e].lake && self.cells[e].session !== 'addLakes') {
+              self.cells[e].session = 'addLakes'
               queue.push(e)
             }
           })
         }
         if (fn === -1) {
-          fn = features.length
-          features.push({i: fn, land: false, border: false})
+          fn = self.features.length
+          self.features.push({i: fn, land: false, border: false})
         }
-        lakeCells.forEach(function(c) {cells[c].fn = fn})
-        unmarked = $.grep(land, function(e) {return e.fn === -1})
+        lakeCells.forEach(function(c) {self.cells[c].fn = fn})
+        unmarked = $.grep(self.land, function(e) {return e.fn === -1})
       }
 
-      land = $.grep(cells, function(e) {return e.height >= 20})
+      self.land = $.grep(self.cells, function(e) {return e.height >= 20})
       console.timeEnd('addLakes')
     }
 
     function editLabel() {
-      if (customization) return
+      if (self.customization) return
 
       unselect()
       closeDialogs('#labelEditor, .stable')
-      elSelected =
+      self.elSelected =
         d3.select(this).call(d3.drag().on('start', elementDrag)).classed('draggable', true)
 
       // update group parameters
@@ -2490,8 +2453,8 @@ export default {
       labelSize.value = group.attr('data-size')
       labelColor.value = toHEX(group.attr('fill'))
       labelOpacity.value = group.attr('opacity')
-      labelText.value = elSelected.text()
-      const tr = parseTransform(elSelected.attr('transform'))
+      labelText.value = self.elSelected.text()
+      const tr = parseTransform(self.elSelected.attr('transform'))
       labelAngle.value = tr[2]
       labelAngleValue.innerHTML = Math.abs(+tr[2]) + '°'
 
@@ -2502,8 +2465,8 @@ export default {
         close: unselect
       })
 
-      if (modules.editLabel) return
-      modules.editLabel = true
+      if (self.modules.editLabel) return
+      self.modules.editLabel = true
 
       loadDefaultFonts()
 
@@ -2525,7 +2488,7 @@ export default {
 
       // on group change
       document.getElementById('labelGroupSelect').addEventListener('change', function() {
-        document.getElementById(this.value).appendChild(elSelected.remove().node())
+        document.getElementById(this.value).appendChild(self.elSelected.remove().node())
       })
 
       // toggle inputs to declare a new group
@@ -2566,9 +2529,9 @@ export default {
       })
 
       function createNewLabelGroup(g) {
-        let group = elSelected.node().parentNode.cloneNode(false)
+        let group = self.elSelected.node().parentNode.cloneNode(false)
         let groupNew = labels.append(f => group).attr('id', g)
-        groupNew.append(f => elSelected.remove().node())
+        groupNew.append(f => self.elSelected.remove().node())
         updateGroupOptions()
         $('#labelGroupSelect, #labelGroupInput').toggle()
         labelGroupInput.value = ''
@@ -2578,7 +2541,7 @@ export default {
 
       // remove label group on click
       document.getElementById('labelGroupRemove').addEventListener('click', function() {
-        let group = d3.select(elSelected.node().parentNode)
+        let group = d3.select(self.elSelected.node().parentNode)
         let id = group.attr('id')
         let count = group.selectAll('text').size()
         // remove group with < 2 label without ask
@@ -2615,37 +2578,37 @@ export default {
           return
         }
         // change Label text
-        if (elSelected.select('textPath').size()) elSelected.select('textPath').text(this.value)
-        else elSelected.text(this.value)
+        if (self.elSelected.select('textPath').size()) self.elSelected.select('textPath').text(this.value)
+        else self.elSelected.text(this.value)
         $('div[aria-describedby=\'labelEditor\'] .ui-dialog-title').text('Edit Label: ' + this.value)
         // check if label is a country name
-        let id = elSelected.attr('id') || ''
+        let id = self.elSelected.attr('id') || ''
         if (id.includes('regionLabel')) {
-          let state = +elSelected.attr('id').slice(11)
-          states[state].name = this.value
+          let state = +self.elSelected.attr('id').slice(11)
+          self.states[state].name = this.value
         }
       })
 
       // generate a random country name
       document.getElementById('labelTextRandom').addEventListener('click', function() {
-        let name = elSelected.text()
-        let id = elSelected.attr('id') || ''
+        let name = self.elSelected.text()
+        let id = self.elSelected.attr('id') || ''
         if (id.includes('regionLabel')) {
           // label is a country name
-          let state = +elSelected.attr('id').slice(11)
+          let state = +self.elSelected.attr('id').slice(11)
           name = generateStateName(state.i)
-          states[state].name = name
+          self.states[state].name = name
         } else {
           // label is not a country name, use random culture
-          let c = elSelected.node().getBBox()
+          let c = self.elSelected.node().getBBox()
           let culture = Math.floor(Math.random() * self.cultures.length)
           name = generateName(culture)
         }
         labelText.value = name
         $('div[aria-describedby=\'labelEditor\'] .ui-dialog-title').text('Edit Label: ' + name)
         // change Label text
-        if (elSelected.select('textPath').size()) elSelected.select('textPath').text(name)
-        else elSelected.text(name)
+        if (self.elSelected.select('textPath').size()) self.elSelected.select('textPath').text(name)
+        else self.elSelected.text(name)
       })
 
       $('#labelFontButton').click(function() {
@@ -2655,7 +2618,7 @@ export default {
 
       // on label font change
       document.getElementById('labelFontSelect').addEventListener('change', function() {
-        let group = elSelected.node().parentNode
+        let group = self.elSelected.node().parentNode
         let font = FONTS[this.value].split(':')[0].replace(/\+/g, ' ')
         group.setAttribute('font-family', font)
         group.setAttribute('data-font', FONTS[this.value])
@@ -2673,7 +2636,7 @@ export default {
 
       // on label size input
       document.getElementById('labelSize').addEventListener('input', function() {
-        let group = elSelected.node().parentNode
+        let group = self.elSelected.node().parentNode
         let size = +this.value
         group.setAttribute('data-size', size)
         group.setAttribute('font-size', _.round((size + (size / scale)) / 2, 2))
@@ -2686,13 +2649,13 @@ export default {
 
       // on label fill color input
       document.getElementById('labelColor').addEventListener('input', function() {
-        let group = elSelected.node().parentNode
+        let group = self.elSelected.node().parentNode
         group.setAttribute('fill', this.value)
       })
 
       // on label opacity input
       document.getElementById('labelOpacity').addEventListener('input', function() {
-        let group = elSelected.node().parentNode
+        let group = self.elSelected.node().parentNode
         group.setAttribute('opacity', this.value)
       })
 
@@ -2703,40 +2666,40 @@ export default {
 
       // on label angle input
       document.getElementById('labelAngle').addEventListener('input', function() {
-        const tr = parseTransform(elSelected.attr('transform'))
+        const tr = parseTransform(self.elSelected.attr('transform'))
         labelAngleValue.innerHTML = Math.abs(+this.value) + '°'
-        const c = elSelected.node().getBBox()
+        const c = self.elSelected.node().getBBox()
         const angle = +this.value
         const transform = `translate(${tr[0]},${tr[1]}) rotate(${angle} ${(c.x + c.width / 2)} ${(c.y + c.height / 2)})`
-        elSelected.attr('transform', transform)
+        self.elSelected.attr('transform', transform)
       })
 
       // display control points to curve label (place on path)
       document.getElementById('labelCurve').addEventListener('click', function() {
-        let c = elSelected.node().getBBox()
+        let c = self.elSelected.node().getBBox()
         let cx = c.x + c.width / 2, cy = c.y + c.height / 2
 
-        if (!elSelected.select('textPath').size()) {
-          let id = elSelected.attr('id')
+        if (!self.elSelected.select('textPath').size()) {
+          let id = self.elSelected.attr('id')
           let pathId = '#textPath_' + id
           let path = `M${cx - c.width},${cy} q${c.width},0 ${c.width * 2},0`
-          let text = elSelected.text(), x = elSelected.attr('x'), y = elSelected.attr('y')
-          elSelected.text(null).attr('data-x', x).attr('data-y', y).attr('x', null).attr('y', null)
+          let text = self.elSelected.text(), x = self.elSelected.attr('x'), y = self.elSelected.attr('y')
+          self.elSelected.text(null).attr('data-x', x).attr('data-y', y).attr('x', null).attr('y', null)
           defs.append('path').attr('id', 'textPath_' + id).attr('d', path)
-          elSelected.append('textPath').attr('href', pathId).attr('startOffset', '50%').text(text)
+          self.elSelected.append('textPath').attr('href', pathId).attr('startOffset', '50%').text(text)
         }
 
         if (!debug.select('circle').size()) {
           debug.append('circle').attr('id', 'textPathControl').attr('r', 1.6)
                .attr('cx', cx).attr('cy', cy)
-               .attr('transform', elSelected.attr('transform') || null)
+               .attr('transform', self.elSelected.attr('transform') || null)
                .call(d3.drag().on('start', textPathControlDrag))
         }
       })
 
       // drag textPath controle point to curve the label
       function textPathControlDrag() {
-        let textPath = defs.select('#textPath_' + elSelected.attr('id'))
+        let textPath = defs.select('#textPath_' + self.elSelected.attr('id'))
         let path = textPath.attr('d').split(' ')
         let M = path[0].split(',')
         let q = path[1].split(',') // +q[1] to get qy - the only changeble value
@@ -2752,30 +2715,30 @@ export default {
 
       // cancel label curvature
       document.getElementById('labelCurveCancel').addEventListener('click', function() {
-        if (!elSelected.select('textPath').size()) return
-        let text = elSelected.text(), x = elSelected.attr('data-x'), y = elSelected.attr('data-y')
-        elSelected.text()
-        elSelected.attr('x', x).attr('y', y).attr('data-x', null).attr('data-y', null).text(text)
-        defs.select('#textPath_' + elSelected.attr('id')).remove()
+        if (!self.elSelected.select('textPath').size()) return
+        let text = self.elSelected.text(), x = self.elSelected.attr('data-x'), y = self.elSelected.attr('data-y')
+        self.elSelected.text()
+        self.elSelected.attr('x', x).attr('y', y).attr('data-x', null).attr('data-y', null).text(text)
+        defs.select('#textPath_' + self.elSelected.attr('id')).remove()
         debug.select('circle').remove()
       })
 
       // open legendsEditor
       document.getElementById('labelLegend').addEventListener('click', function() {
-        let id = elSelected.attr('id')
-        let name = elSelected.text()
+        let id = self.elSelected.attr('id')
+        let name = self.elSelected.text()
         editLegends(id, name)
       })
 
       // copy label on click
       document.getElementById('labelCopy').addEventListener('click', function() {
-        let group = d3.select(elSelected.node().parentNode)
-        copy = group.append(f => elSelected.node().cloneNode(true))
+        let group = d3.select(self.elSelected.node().parentNode)
+        copy = group.append(f => self.elSelected.node().cloneNode(true))
         let id = 'label' + Date.now().toString().slice(7)
         copy.attr('id', id).attr('class', null).on('click', editLabel)
         let shift = +group.attr('font-size') + 1
         if (copy.select('textPath').size()) {
-          let path = defs.select('#textPath_' + elSelected.attr('id')).attr('d')
+          let path = defs.select('#textPath_' + self.elSelected.attr('id')).attr('d')
           let textPath = defs.append('path').attr('id', 'textPath_' + id)
           copy.select('textPath').attr('href', '#textPath_' + id)
           let pathArray = path.split(' ')
@@ -2784,8 +2747,8 @@ export default {
           textPath.attr('d', `M${x - shift},${y - shift} ${pathArray[1]} ${pathArray[2]}`)
           shift
         } else {
-          let x = +elSelected.attr('x') - shift
-          let y = +elSelected.attr('y') - shift
+          let x = +self.elSelected.attr('x') - shift
+          let y = +self.elSelected.attr('y') - shift
           while (group.selectAll('text[x=\'' + x + '\']').size()) {
             x -= shift
             y -= shift
@@ -2802,8 +2765,8 @@ export default {
           buttons: {
             Remove: function() {
               $(this).dialog('close')
-              elSelected.remove()
-              defs.select('#textPath_' + elSelected.attr('id')).remove()
+              self.elSelected.remove()
+              defs.select('#textPath_' + self.elSelected.attr('id')).remove()
               $('#labelEditor').dialog('close')
             },
             Cancel: function() {$(this).dialog('close')}
@@ -2813,11 +2776,11 @@ export default {
     }
 
     function editRiver() {
-      if (customization) return
-      if (elSelected) {
-        const self = d3.select(this).attr('id') === elSelected.attr('id')
+      if (self.customization) return
+      if (self.elSelected) {
+        const self = d3.select(this).attr('id') === self.elSelected.attr('id')
         const point = d3.mouse(this)
-        if (elSelected.attr('data-river') === 'new') {
+        if (self.elSelected.attr('data-river') === 'new') {
           addRiverPoint([point[0], point[1]])
           completeNewRiver()
           return
@@ -2829,15 +2792,15 @@ export default {
 
       unselect()
       closeDialogs('#riverEditor, .stable')
-      elSelected = d3.select(this)
-      elSelected.call(d3.drag().on('start', riverDrag))
+      self.elSelected = d3.select(this)
+      self.elSelected.call(d3.drag().on('start', riverDrag))
 
-      const tr = parseTransform(elSelected.attr('transform'))
+      const tr = parseTransform(self.elSelected.attr('transform'))
       riverAngle.value = tr[2]
       riverAngleValue.innerHTML = Math.abs(+tr[2]) + '°'
       riverScale.value = tr[5]
-      riverWidthInput.value = +elSelected.attr('data-width')
-      riverIncrement.value = +elSelected.attr('data-increment')
+      riverWidthInput.value = +self.elSelected.attr('data-width')
+      riverIncrement.value = +self.elSelected.attr('data-increment')
 
       $('#riverEditor').dialog({
         title: 'Edit River',
@@ -2852,8 +2815,8 @@ export default {
       if (!debug.select('.controlPoints').size()) debug.append('g').attr('class', 'controlPoints')
       riverDrawPoints()
 
-      if (modules.editRiver) {return}
-      modules.editRiver = true
+      if (self.modules.editRiver) {return}
+      self.modules.editRiver = true
 
       function riverAddControlPoint(point) {
         let dists = []
@@ -2881,7 +2844,7 @@ export default {
       }
 
       function riverDrawPoints() {
-        const node = elSelected.node()
+        const node = self.elSelected.node()
         // river is a polygon, so divide length by 2 to get course length
         const l = node.getTotalLength() / 2
         const parts = (l / 5) >> 0 // number of points
@@ -2918,11 +2881,11 @@ export default {
 
       function riverDrag() {
         const x = d3.event.x, y = d3.event.y
-        const tr = parseTransform(elSelected.attr('transform'))
+        const tr = parseTransform(self.elSelected.attr('transform'))
         d3.event.on('drag', function() {
           let xc = d3.event.x, yc = d3.event.y
           let transform = `translate(${(+tr[0] + xc - x)},${(+tr[1] + yc - y)}) rotate(${tr[2]} ${tr[3]} ${tr[4]}) scale(${tr[5]})`
-          elSelected.attr('transform', transform)
+          self.elSelected.attr('transform', transform)
           debug.select('.controlPoints').attr('transform', transform)
         })
       }
@@ -2936,19 +2899,24 @@ export default {
         const width = +riverWidthInput.value
         const increment = +riverIncrement.value
         const d = drawRiverSlow(points, width, increment)
-        elSelected.attr('d', d)
+        self.elSelected.attr('d', d)
       }
 
       $('#riverWidthInput, #riverIncrement').change(function() {
         const width = +riverWidthInput.value
         const increment = +riverIncrement.value
-        elSelected.attr('data-width', width).attr('data-increment', increment)
+        self.elSelected.attr('data-width', width).attr('data-increment', increment)
         redrawRiver()
       })
 
       $('#riverRegenerate').click(function() {
-        let points = [], amended = [], x, y, p1, p2
-        const node = elSelected.node()
+        let points = []
+        let amended = []
+        let x
+        let y
+        let p1
+        let p2
+        const node = self.elSelected.node()
         const l = node.getTotalLength() / 2
         const parts = (l / 8) >> 0 // number of points
         let inc = l / parts // increment
@@ -2986,25 +2954,25 @@ export default {
         const increment = +riverIncrement.value * 0.9 + Math.random() * 0.2
         riverWidthInput.value = width
         riverIncrement.value = increment
-        elSelected.attr('data-width', width).attr('data-increment', increment)
+        self.elSelected.attr('data-width', width).attr('data-increment', increment)
         const d = drawRiverSlow(amended, width, increment)
-        elSelected.attr('d', d).attr('data-width', width).attr('data-increment', increment)
+        self.elSelected.attr('d', d).attr('data-width', width).attr('data-increment', increment)
         debug.select('.controlPoints').selectAll('*').remove()
         amended.map(function(p) {addRiverPoint(p)})
       })
 
       $('#riverAngle').on('input', function() {
-        const tr = parseTransform(elSelected.attr('transform'))
+        const tr = parseTransform(self.elSelected.attr('transform'))
         riverAngleValue.innerHTML = Math.abs(+this.value) + '°'
-        const c = elSelected.node().getBBox()
+        const c = self.elSelected.node().getBBox()
         const angle = +this.value, scale = +tr[5]
         const transform = `translate(${tr[0]},${tr[1]}) rotate(${angle} ${(c.x + c.width / 2) * scale} ${(c.y + c.height / 2) * scale}) scale(${scale})`
-        elSelected.attr('transform', transform)
+        self.elSelected.attr('transform', transform)
         debug.select('.controlPoints').attr('transform', transform)
       })
 
       $('#riverReset').click(function() {
-        elSelected.attr('transform', '')
+        self.elSelected.attr('transform', '')
         debug.select('.controlPoints').attr('transform', '')
         riverAngle.value = 0
         riverAngleValue.innerHTML = '0°'
@@ -3012,16 +2980,16 @@ export default {
       })
 
       $('#riverScale').change(function() {
-        const tr = parseTransform(elSelected.attr('transform'))
+        const tr = parseTransform(self.elSelected.attr('transform'))
         const scaleOld = +tr[5], scale = +this.value
-        const c = elSelected.node().getBBox()
+        const c = self.elSelected.node().getBBox()
         const cx = c.x + c.width / 2, cy = c.y + c.height / 2
         const trX = +tr[0] + cx * (scaleOld - scale)
         const trY = +tr[1] + cy * (scaleOld - scale)
         const scX = +tr[3] * scale / scaleOld
         const scY = +tr[4] * scale / scaleOld
         const transform = `translate(${trX},${trY}) rotate(${tr[2]} ${scX} ${scY}) scale(${scale})`
-        elSelected.attr('transform', transform)
+        self.elSelected.attr('transform', transform)
         debug.select('.controlPoints').attr('transform', transform)
       })
 
@@ -3032,7 +3000,7 @@ export default {
           // enter creation mode
           $('.pressed').removeClass('pressed')
           $(this).addClass('pressed')
-          if (elSelected) elSelected.call(d3.drag().on('drag', null))
+          if (self.elSelected) self.elSelected.call(d3.drag().on('drag', null))
           debug.select('.controlPoints').selectAll('*').remove()
           viewbox.style('cursor', 'crosshair').on('click', newRiverAddPoint)
         }
@@ -3041,16 +3009,16 @@ export default {
       function newRiverAddPoint() {
         const point = d3.mouse(this)
         addRiverPoint([point[0], point[1]])
-        if (!elSelected || elSelected.attr('data-river') !== 'new') {
+        if (!self.elSelected || self.elSelected.attr('data-river') !== 'new') {
           const id = +$('#rivers > path').last().attr('id').slice(5) + 1
-          elSelected = rivers.append('path').attr('data-river', 'new').attr('id', 'river' + id)
+          self.elSelected = rivers.append('path').attr('data-river', 'new').attr('id', 'river' + id)
                              .attr('data-width', 2).attr('data-increment', 1)
                              .on('click', completeNewRiver)
         } else {
           redrawRiver()
-          let cell = diagram.find(point[0], point[1]).index
-          let f = cells[cell].fn
-          let ocean = !features[f].land && features[f].border
+          let cell = self.diagram.find(point[0], point[1]).index
+          let f = self.cells[cell].fn
+          let ocean = !self.features[f].land && self.features[f].border
           if (ocean && debug.select('.controlPoints').selectAll('circle')
                             .size() > 5) completeNewRiver()
         }
@@ -3059,25 +3027,25 @@ export default {
       function completeNewRiver() {
         $('#riverNew').removeClass('pressed')
         restoreDefaultEvents()
-        if (!elSelected || elSelected.attr('data-river') !== 'new') return
+        if (!self.elSelected || self.elSelected.attr('data-river') !== 'new') return
         redrawRiver()
-        elSelected.attr('data-river', '')
-        elSelected.call(d3.drag().on('start', riverDrag)).on('click', editRiver)
-        const r = +elSelected.attr('id').slice(5)
+        self.elSelected.attr('data-river', '')
+        self.elSelected.call(d3.drag().on('start', riverDrag)).on('click', editRiver)
+        const r = +self.elSelected.attr('id').slice(5)
         debug.select('.controlPoints').selectAll('circle').each(function() {
           const x = +d3.select(this).attr('cx')
           const y = +d3.select(this).attr('cy')
-          const cell = diagram.find(x, y, 3)
+          const cell = self.diagram.find(x, y, 3)
           if (!cell) return
-          if (cells[cell.index].river === undefined) cells[cell.index].river = r
+          if (self.cells[cell.index].river === undefined) self.cells[cell.index].river = r
         })
         unselect()
         debug.append('g').attr('class', 'controlPoints')
       }
 
       $('#riverCopy').click(function() {
-        const tr = parseTransform(elSelected.attr('transform'))
-        const d = elSelected.attr('d')
+        const tr = parseTransform(self.elSelected.attr('transform'))
+        const d = self.elSelected.attr('d')
         let x = 2, y = 2
         let transform = `translate(${tr[0] - x},${tr[1] - y}) rotate(${tr[2]} ${tr[3]} ${tr[4]}) scale(${tr[5]})`
         while (rivers.selectAll('[transform=\'' + transform + '\'][d=\'' + d + '\']').size() > 0) {
@@ -3090,14 +3058,14 @@ export default {
         rivers.append('path').attr('d', d)
               .attr('transform', transform)
               .attr('id', 'river' + river).on('click', editRiver)
-              .attr('data-width', elSelected.attr('data-width'))
-              .attr('data-increment', elSelected.attr('data-increment'))
+              .attr('data-width', self.elSelected.attr('data-width'))
+              .attr('data-increment', self.elSelected.attr('data-increment'))
         unselect()
       })
 
       // open legendsEditor
       document.getElementById('riverLegend').addEventListener('click', function() {
-        let id = elSelected.attr('id')
+        let id = self.elSelected.attr('id')
         editLegends(id, id)
       })
 
@@ -3108,15 +3076,15 @@ export default {
           buttons: {
             Remove: function() {
               $(this).dialog('close')
-              const river = +elSelected.attr('id').slice(5)
-              const avPrec = _.round(precInput.value / Math.sqrt(cells.length), 2)
-              land.map(function(l) {
+              const river = +self.elSelected.attr('id').slice(5)
+              const avPrec = _.round(precInput.value / Math.sqrt(self.cells.length), 2)
+              self.land.map(function(l) {
                 if (l.river === river) {
                   l.river = undefined
                   l.flux = avPrec
                 }
               })
-              elSelected.remove()
+              self.elSelected.remove()
               unselect()
               $('#riverEditor').dialog('close')
             },
@@ -3128,11 +3096,11 @@ export default {
     }
 
     function editRoute() {
-      if (customization) {return}
-      if (elSelected) {
-        const self = d3.select(this).attr('id') === elSelected.attr('id')
+      if (self.customization) {return}
+      if (self.elSelected) {
+        const self = d3.select(this).attr('id') === self.elSelected.attr('id')
         const point = d3.mouse(this)
-        if (elSelected.attr('data-route') === 'new') {
+        if (self.elSelected.attr('data-route') === 'new') {
           addRoutePoint({x: point[0], y: point[1]})
           completeNewRoute()
           return
@@ -3146,7 +3114,7 @@ export default {
       closeDialogs('#routeEditor, .stable')
 
       if (this && this !== window) {
-        elSelected = d3.select(this)
+        self.elSelected = d3.select(this)
         if (!debug.select('.controlPoints').size()) debug.append('g')
                                                          .attr('class', 'controlPoints')
         routeDrawPoints()
@@ -3164,10 +3132,10 @@ export default {
             unselect()
           }
         })
-      } else {elSelected = null}
+      } else {self.elSelected = null}
 
-      if (modules.editRoute) {return}
-      modules.editRoute = true
+      if (self.modules.editRoute) {return}
+      self.modules.editRoute = true
 
       function routeAddControlPoint(point) {
         let dists = []
@@ -3195,8 +3163,8 @@ export default {
       }
 
       function routeDrawPoints() {
-        if (!elSelected.size()) return
-        const node = elSelected.node()
+        if (!self.elSelected.size()) return
+        const node = self.elSelected.node()
         const l = node.getTotalLength()
         const parts = (l / 5) >> 0 // number of points
         let inc = l / parts // increment
@@ -3239,18 +3207,18 @@ export default {
           points.push({scX: +el.attr('cx'), scY: +el.attr('cy')})
         })
         lineGen.curve(d3.curveCatmullRom.alpha(0.1))
-        elSelected.attr('d', lineGen(points))
+        self.elSelected.attr('d', lineGen(points))
         // get route distance
-        const l = elSelected.node().getTotalLength()
+        const l = self.elSelected.node().getTotalLength()
         routeLength.innerHTML = Math.round(l * distanceScale.value) + ' ' + distanceUnit.value
       }
 
       function addNewRoute() {
-        let routeType = elSelected && elSelected.node() ? elSelected.node().parentNode.id :
+        let routeType = self.elSelected && self.elSelected.node() ? self.elSelected.node().parentNode.id :
                         'searoutes'
         const group = routes.select('#' + routeType)
         const id = routeType + '' + group.selectAll('*').size()
-        elSelected =
+        self.elSelected =
           group.append('path').attr('data-route', 'new').attr('id', id).on('click', editRoute)
         routeUpdateGroups()
         $('#routeEditor').dialog({
@@ -3273,22 +3241,22 @@ export default {
       function completeNewRoute() {
         $('#routeNew, #addRoute').removeClass('pressed')
         restoreDefaultEvents()
-        if (!elSelected.size()) return
-        if (elSelected.attr('data-route') === 'new') {
+        if (!self.elSelected.size()) return
+        if (self.elSelected.attr('data-route') === 'new') {
           routeRedraw()
-          elSelected.attr('data-route', '')
-          const node = elSelected.node()
+          self.elSelected.attr('data-route', '')
+          const node = self.elSelected.node()
           const l = node.getTotalLength()
           let pathCells = []
           for (let i = 0; i <= l; i++) {
             const p = node.getPointAtLength(i)
-            const cell = diagram.find(p.x, p.y)
+            const cell = self.diagram.find(p.x, p.y)
             if (!cell) {return}
             pathCells.push(cell.index)
           }
           const uniqueCells = [...new Set(pathCells)]
           uniqueCells.map(function(c) {
-            if (cells[c].path !== undefined) {cells[c].path += 1} else {cells[c].path = 1}
+            if (self.cells[c].path !== undefined) {self.cells[c].path += 1} else {self.cells[c].path = 1}
           })
         }
         tip('', true)
@@ -3304,9 +3272,10 @@ export default {
       }
 
       function routeSplitInPoint(clicked) {
-        const group = d3.select(elSelected.node().parentNode)
+        const group = d3.select(self.elSelected.node().parentNode)
         $('#routeSplit').removeClass('pressed')
-        const points1 = [], points2 = []
+        const points1 = []
+        const points2 = []
         let points = points1
         debug.select('.controlPoints').selectAll('circle').each(function() {
           const el = d3.select(this)
@@ -3318,19 +3287,19 @@ export default {
           el.remove()
         })
         lineGen.curve(d3.curveCatmullRom.alpha(0.1))
-        elSelected.attr('d', lineGen(points1))
+        self.elSelected.attr('d', lineGen(points1))
         const id = routeGroup.value + '' + group.selectAll('*').size()
         group.append('path').attr('id', id).attr('d', lineGen(points2)).on('click', editRoute)
-        routeDrawPoints()
+        routeDrawpoints()
       }
 
       $('#routeGroup').change(function() {
-        $(elSelected.node()).detach().appendTo($('#' + this.value))
+        $(self.elSelected.node()).detach().appendTo($('#' + this.value))
       })
 
       // open legendsEditor
       document.getElementById('routeLegend').addEventListener('click', function() {
-        let id = elSelected.attr('id')
+        let id = self.elSelected.attr('id')
         editLegends(id, id)
       })
 
@@ -3355,7 +3324,7 @@ export default {
           buttons: {
             Remove: function() {
               $(this).dialog('close')
-              elSelected.remove()
+              self.elSelected.remove()
               $('#routeEditor').dialog('close')
             },
             Cancel: function() {$(this).dialog('close')}
@@ -3365,12 +3334,12 @@ export default {
     }
 
     function editIcon() {
-      if (customization) return
-      if (elSelected) if (this.isSameNode(elSelected.node())) return
+      if (self.customization) return
+      if (self.elSelected) if (this.isSameNode(self.elSelected.node())) return
 
       unselect()
       closeDialogs('#iconEditor, .stable')
-      elSelected =
+      self.elSelected =
         d3.select(this).call(d3.drag().on('start', elementDrag)).classed('draggable', true)
 
       // update group parameters
@@ -3389,8 +3358,8 @@ export default {
         close: unselect
       })
 
-      if (modules.editIcon) {return}
-      modules.editIcon = true
+      if (self.modules.editIcon) {return}
+      self.modules.editIcon = true
 
       $('#iconGroups').click(function() {
         $('#iconEditor > button').not(this).toggle()
@@ -3414,12 +3383,12 @@ export default {
       $('#iconGroup').change(function() {
         const newGroup = this.value
         const to = $('#icons > #' + newGroup)
-        $(elSelected.node()).detach().appendTo(to)
+        $(self.elSelected.node()).detach().appendTo(to)
       })
 
       $('#iconCopy').click(function() {
-        const group = d3.select(elSelected.node().parentNode)
-        const copy = elSelected.node().cloneNode()
+        const group = d3.select(self.elSelected.node().parentNode)
+        const copy = self.elSelected.node().cloneNode()
         copy.removeAttribute('data-id') // remove assignment to burg if any
         const tr = parseTransform(copy.getAttribute('transform'))
         const shift = 10 / Math.sqrt(scale)
@@ -3434,7 +3403,7 @@ export default {
       })
 
       $('#iconRemoveGroup').click(function() {
-        const group = d3.select(elSelected.node().parentNode)
+        const group = d3.select(self.elSelected.node().parentNode)
         const count = group.selectAll('*').size()
         if (count < 2) {
           group.remove()
@@ -3462,12 +3431,12 @@ export default {
       })
 
       $('#iconFillColor').change(function() {
-        const group = d3.select(elSelected.node().parentNode)
+        const group = d3.select(self.elSelected.node().parentNode)
         group.attr('fill', this.value)
       })
 
       $('#iconStrokeColor').change(function() {
-        const group = d3.select(elSelected.node().parentNode)
+        const group = d3.select(self.elSelected.node().parentNode)
         group.attr('stroke', this.value)
       })
 
@@ -3477,7 +3446,7 @@ export default {
       })
 
       $('#iconSize').change(function() {
-        const group = d3.select(elSelected.node().parentNode)
+        const group = d3.select(self.elSelected.node().parentNode)
         const size = +this.value
         group.attr('size', size)
         group.selectAll('*')
@@ -3485,7 +3454,7 @@ export default {
       })
 
       $('#iconStrokeWidth').change(function() {
-        const group = d3.select(elSelected.node().parentNode)
+        const group = d3.select(self.elSelected.node().parentNode)
         group.attr('stroke-width', this.value)
       })
 
@@ -3496,7 +3465,7 @@ export default {
           buttons: {
             Remove: function() {
               $(this).dialog('close')
-              elSelected.remove()
+              self.elSelected.remove()
               $('#iconEditor').dialog('close')
             },
             Cancel: function() {$(this).dialog('close')}
@@ -3506,14 +3475,14 @@ export default {
     }
 
     function editReliefIcon() {
-      if (customization) return
-      if (elSelected) if (this.isSameNode(elSelected.node())) return
+      if (self.customization) return
+      if (self.elSelected) if (this.isSameNode(self.elSelected.node())) return
 
       unselect()
       closeDialogs('#reliefEditor, .stable')
-      elSelected =
+      self.elSelected =
         d3.select(this).raise().call(d3.drag().on('start', elementDrag)).classed('draggable', true)
-      const group = elSelected.node().parentNode.id
+      const group = self.elSelected.node().parentNode.id
       reliefGroup.value = group
 
       let bulkRemoveSection = document.getElementById('reliefBulkRemoveSection')
@@ -3526,8 +3495,8 @@ export default {
         close: unselect
       })
 
-      if (modules.editReliefIcon) {return}
-      modules.editReliefIcon = true
+      if (self.modules.editReliefIcon) {return}
+      self.modules.editReliefIcon = true
 
       $('#reliefGroups').click(function() {
         $('#reliefEditor > button').not(this).toggle()
@@ -3536,19 +3505,19 @@ export default {
 
       $('#reliefGroup').change(function() {
         const type = this.value
-        const bbox = elSelected.node().getBBox()
+        const bbox = self.elSelected.node().getBBox()
         const cx = bbox.x
         const cy = bbox.y + bbox.height / 2
-        const cell = diagram.find(cx, cy).index
-        const height = cell !== undefined ? cells[cell].height : 50
-        elSelected.remove()
-        elSelected = addReliefIcon(height / 100, type, cx, cy, cell)
-        elSelected.call(d3.drag().on('start', elementDrag))
+        const cell = self.diagram.find(cx, cy).index
+        const height = cell !== undefined ? self.cells[cell].height : 50
+        self.elSelected.remove()
+        self.elSelected = addReliefIcon(height / 100, type, cx, cy, cell)
+        self.elSelected.call(d3.drag().on('start', elementDrag))
       })
 
       $('#reliefCopy').click(function() {
-        const group = d3.select(elSelected.node().parentNode)
-        const copy = elSelected.node().cloneNode(true)
+        const group = d3.select(self.elSelected.node().parentNode)
+        const copy = self.elSelected.node().cloneNode(true)
         const tr = parseTransform(copy.getAttribute('transform'))
         const shift = 10 / Math.sqrt(scale)
         let transform = 'translate(' + _.round(tr[0] - shift, 1) + ',' + _.round(tr[1] - shift, 1) + ')'
@@ -3567,7 +3536,7 @@ export default {
       })
 
       $('#reliefRemoveGroup').click(function() {
-        const group = d3.select(elSelected.node().parentNode)
+        const group = d3.select(self.elSelected.node().parentNode)
         const count = group.selectAll('*').size()
         if (count < 2) {
           group.selectAll('*').remove()
@@ -3596,19 +3565,19 @@ export default {
           section.style.display = 'inline-block'
           tip('Drag to remove relief icons in radius', true)
           viewbox.style('cursor', 'crosshair').call(d3.drag().on('drag', dragToRemoveReliefIcons))
-          customization = 5
+          self.customization = 5
         } else {
           section.style.display = 'none'
           restoreDefaultEvents()
-          customization = 0
+          self.customization = 0
         }
       })
 
       function dragToRemoveReliefIcons() {
         let point = d3.mouse(this)
-        let cell = diagram.find(point[0], point[1]).index
+        let cell = self.diagram.find(point[0], point[1]).index
         let radius = +reliefBulkRemoveRadius.value
-        let r = Math.round(6 / graphSize * radius, 1)
+        let r = Math.round(6 / self.graphSize * radius, 1)
         moveCircle(point[0], point[1], r)
         let selection = defineBrushSelection(cell, radius)
         if (selection) removeReliefIcons(selection)
@@ -3629,7 +3598,7 @@ export default {
           buttons: {
             Remove: function() {
               $(this).dialog('close')
-              elSelected.remove()
+              self.elSelected.remove()
               $('#reliefEditor').dialog('close')
             },
             Cancel: function() {$(this).dialog('close')}
@@ -3639,20 +3608,20 @@ export default {
     }
 
     function editBurg() {
-      if (customization) return
+      if (self.customization) return
       unselect()
       closeDialogs('#burgEditor, .stable')
-      elSelected = d3.select(this)
-      const id = +elSelected.attr('data-id')
+      self.elSelected = d3.select(this)
+      const id = +self.elSelected.attr('data-id')
       if (id === undefined) return
       d3.selectAll('[data-id=\'' + id + '\']').call(d3.drag().on('start', elementDrag))
         .classed('draggable', true)
 
       // update Burg details
-      const type = elSelected.node().parentNode.id
+      const type = self.elSelected.node().parentNode.id
       const labelGroup = burgLabels.select('#' + type)
       const iconGroup = burgIcons.select('#' + type)
-      burgNameInput.value = manors[id].name
+      burgNameInput.value = self.manors[id].name
       updateBurgsGroupOptions()
       burgSelectGroup.value = labelGroup.attr('id')
       burgSelectDefaultFont.value = FONTS.indexOf(labelGroup.attr('data-font'))
@@ -3660,7 +3629,7 @@ export default {
       burgLabelColorInput.value = toHEX(labelGroup.attr('fill'))
       burgLabelOpacity.value =
         labelGroup.attr('opacity') === undefined ? 1 : +labelGroup.attr('opacity')
-      const tr = parseTransform(elSelected.attr('transform'))
+      const tr = parseTransform(self.elSelected.attr('transform'))
       burgLabelAngle.value = tr[2]
       burgLabelAngleOutput.innerHTML = Math.abs(+tr[2]) + '°'
       burgIconSize.value = iconGroup.attr('size')
@@ -3671,34 +3640,34 @@ export default {
       burgIconStrokeOpacity.value =
         iconGroup.attr('stroke-opacity') === undefined ? 1 : +iconGroup.attr('stroke-opacity')
       burgIconStrokeColor.value = iconGroup.attr('stroke')
-      const cell = cells[manors[id].cell]
+      const cell = self.cells[self.manors[id].cell]
       if (cell.region !== 'neutral' && cell.region !== undefined) {
         burgToggleCapital.disabled = false
-        const capital = states[manors[id].region] ?
-                        id === states[manors[id].region].capital ? 1 : 0 : 0
+        const capital = self.states[self.manors[id].region] ?
+                        id === self.states[self.manors[id].region].capital ? 1 : 0 : 0
         d3.select('#burgToggleCapital').classed('pressed', capital)
       } else {
         burgToggleCapital.disabled = true
         d3.select('#burgToggleCapital').classed('pressed', false)
       }
       d3.select('#burgTogglePort').classed('pressed', cell.port !== undefined)
-      burgPopulation.value = manors[id].population
+      burgPopulation.value = self.manors[id].population
       burgPopulationFriendly.value =
-        Math.round(manors[id].population * urbanization.value * populationRate.value * 1000)
+        Math.round(self.manors[id].population * urbanization.value * populationRate.value * 1000)
 
       $('#burgEditor').dialog({
-        title: 'Edit Burg: ' + manors[id].name,
+        title: 'Edit Burg: ' + self.manors[id].name,
         minHeight: 30, width: 'auto', resizable: false,
         position: {my: 'center top+40', at: 'top', of: d3.event},
         close: function() {
           d3.selectAll('[data-id=\'' + id + '\']').call(d3.drag().on('drag', null))
             .classed('draggable', false)
-          elSelected = null
+          self.elSelected = null
         }
       })
 
-      if (modules.editBurg) return
-      modules.editBurg = true
+      if (self.modules.editBurg) return
+      self.modules.editBurg = true
 
       loadDefaultFonts()
 
@@ -3735,7 +3704,7 @@ export default {
       })
 
       $('#burgSelectGroup').change(function() {
-        const id = +elSelected.attr('data-id')
+        const id = +self.elSelected.attr('data-id')
         const g = this.value
         moveBurgToGroup(id, g)
       })
@@ -3749,7 +3718,7 @@ export default {
         }
         burgInputGroup.value = ''
         // clone old group assigning new id
-        const id = elSelected.node().parentNode.id
+        const id = self.elSelected.node().parentNode.id
         const l = burgLabels.select('#' + id).node().cloneNode(false)
         l.id = newGroup
         const i = burgIcons.select('#' + id).node().cloneNode(false)
@@ -3777,9 +3746,9 @@ export default {
       })
 
       $('#burgRemoveGroup').click(function() {
-        const group = d3.select(elSelected.node().parentNode)
+        const group = d3.select(self.elSelected.node().parentNode)
         const type = group.attr('id')
-        const id = +elSelected.attr('data-id')
+        const id = +self.elSelected.attr('data-id')
         const count = group.selectAll('*').size()
         const message = 'Are you sure you want to remove all Burgs (' + count + ') of that group?'
         alertMessage.innerHTML = message
@@ -3791,14 +3760,14 @@ export default {
               group.selectAll('*').each(function(d) {
                 const id = +d3.select(this).attr('data-id')
                 if (id === undefined) return
-                const cell = manors[id].cell
-                const state = manors[id].region
-                if (states[state]) {
-                  if (states[state].capital === id) states[state].capital = 'select'
-                  states[state].burgs--
+                const cell = self.manors[id].cell
+                const state = self.manors[id].region
+                if (self.states[state]) {
+                  if (self.states[state].capital === id) self.states[state].capital = 'select'
+                  self.states[state].burgs--
                 }
-                manors[id].region = 'removed'
-                cells[cell].manor = undefined
+                self.manors[id].region = 'removed'
+                self.cells[cell].manor = undefined
               })
               burgLabels.select('#' + type).selectAll('*').remove()
               burgIcons.select('#' + type).selectAll('*').remove()
@@ -3819,19 +3788,19 @@ export default {
             'Name should not be blank, set opacity to 0 to hide label or remove button to delete')
           return
         }
-        const id = +elSelected.attr('data-id')
+        const id = +self.elSelected.attr('data-id')
         burgLabels.selectAll('[data-id=\'' + id + '\']').text(this.value)
-        manors[id].name = this.value
+        self.manors[id].name = this.value
         $('div[aria-describedby=\'burgEditor\'] .ui-dialog-title').text('Edit Burg: ' + this.value)
       })
 
       $('#burgNameReCulture, #burgNameReRandom').click(function() {
-        const id = +elSelected.attr('data-id')
-        const culture = this.id === 'burgNameReCulture' ? manors[id].culture :
+        const id = +self.elSelected.attr('data-id')
+        const culture = this.id === 'burgNameReCulture' ? self.manors[id].culture :
                         Math.floor(Math.random() * self.cultures.length)
         const name = generateName(culture)
         burgLabels.selectAll('[data-id=\'' + id + '\']').text(name)
-        manors[id].name = name
+        self.manors[id].name = name
         burgNameInput.value = name
         $('div[aria-describedby=\'burgEditor\'] .ui-dialog-title').text('Edit Burg: ' + name)
       })
@@ -3848,7 +3817,7 @@ export default {
       })
 
       $('#burgSelectDefaultFont').change(function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgLabels.select('#' + type)
         if (burgSelectDefaultFont.value === '') return
         const font = FONTS[burgSelectDefaultFont.value].split(':')[0].replace(/\+/g, ' ')
@@ -3865,26 +3834,26 @@ export default {
       })
 
       $('#burgSetLabelSize').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgLabels.select('#' + type)
         group.attr('data-size', +this.value)
         invokeActiveZooming()
       })
 
       $('#burgLabelColorInput').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgLabels.select('#' + type)
         group.attr('fill', this.value)
       })
 
       $('#burgLabelOpacity').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgLabels.select('#' + type)
         group.attr('opacity', +this.value)
       })
 
       $('#burgLabelAngle').on('input', function() {
-        const id = +elSelected.attr('data-id')
+        const id = +self.elSelected.attr('data-id')
         const el = burgLabels.select('[data-id=\'' + id + '\']')
         const tr = parseTransform(el.attr('transform'))
         const c = el.node().getBBox()
@@ -3895,7 +3864,7 @@ export default {
       })
 
       $('#burgIconSize').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgIcons.select('#' + type)
         const size = +this.value
         group.attr('size', size)
@@ -3903,65 +3872,65 @@ export default {
       })
 
       $('#burgIconFillOpacity').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgIcons.select('#' + type)
         group.attr('fill-opacity', +this.value)
       })
 
       $('#burgIconFillColor').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgIcons.select('#' + type)
         group.attr('fill', this.value)
       })
 
       $('#burgIconStrokeWidth').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgIcons.select('#' + type)
         group.attr('stroke-width', +this.value)
       })
 
       $('#burgIconStrokeOpacity').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgIcons.select('#' + type)
         group.attr('stroke-opacity', +this.value)
       })
 
       $('#burgIconStrokeColor').on('input', function() {
-        const type = elSelected.node().parentNode.id
+        const type = self.elSelected.node().parentNode.id
         const group = burgIcons.select('#' + type)
         group.attr('stroke', this.value)
       })
 
       $('#burgToggleCapital').click(function() {
-        const id = +elSelected.attr('data-id')
-        const state = manors[id].region
-        if (states[state] === undefined) return
-        const capital = states[manors[id].region] ?
-                        id === states[manors[id].region].capital ? 0 : 1 : 1
-        if (capital && states[state].capital !== 'select') {
+        const id = +self.elSelected.attr('data-id')
+        const state = self.manors[id].region
+        if (self.states[state] === undefined) return
+        const capital = self.states[self.manors[id].region] ?
+                        id === self.states[self.manors[id].region].capital ? 0 : 1 : 1
+        if (capital && self.states[state].capital !== 'select') {
           // move oldCapital to a town group
-          const oldCapital = states[state].capital
+          const oldCapital = self.states[state].capital
           moveBurgToGroup(oldCapital, 'towns')
         }
-        states[state].capital = capital ? id : 'select'
+        self.states[state].capital = capital ? id : 'select'
         d3.select('#burgToggleCapital').classed('pressed', capital)
         const g = capital ? 'capitals' : 'towns'
         moveBurgToGroup(id, g)
       })
 
       $('#burgTogglePort').click(function() {
-        const id = +elSelected.attr('data-id')
-        const cell = cells[manors[id].cell]
+        const id = +self.elSelected.attr('data-id')
+        const cell = self.cells[self.manors[id].cell]
         const markAsPort = cell.port === undefined ? true : undefined
         cell.port = markAsPort
         d3.select('#burgTogglePort').classed('pressed', markAsPort)
         if (markAsPort) {
-          const type = elSelected.node().parentNode.id
+          const type = self.elSelected.node().parentNode.id
           const ag = type === 'capitals' ? '#capital-anchors' : '#town-anchors'
           const group = icons.select(ag)
           const size = +group.attr('size')
-          const x = _.round(manors[id].x - size * 0.47, 2)
-          const y = _.round(manors[id].y - size * 0.47, 2)
+          const x = _.round(self.manors[id].x - size * 0.47, 2)
+          const y = _.round(self.manors[id].y - size * 0.47, 2)
           group.append('use').attr('xlink:href', '#icon-anchor').attr('data-id', id)
                .attr('x', x).attr('y', y).attr('width', size).attr('height', size)
                .on('click', editIcon)
@@ -3971,10 +3940,10 @@ export default {
       })
 
       $('#burgPopulation').on('input', function() {
-        const id = +elSelected.attr('data-id')
+        const id = +self.elSelected.attr('data-id')
         burgPopulationFriendly.value =
           Math.round(this.value * urbanization.value * populationRate.value * 1000)
-        manors[id].population = +this.value
+        self.manors[id].population = +this.value
       })
 
       $('#burgRelocate').click(function() {
@@ -3984,7 +3953,7 @@ export default {
           tip('', true)
         } else {
           $('.pressed').removeClass('pressed')
-          const id = elSelected.attr('data-id')
+          const id = self.elSelected.attr('data-id')
           $(this).addClass('pressed').attr('data-id', id)
           viewbox.style('cursor', 'crosshair').on('click', relocateBurgOnClick)
           tip('Click on map to relocate burg. Hold Shift for continuous move', true)
@@ -3993,9 +3962,9 @@ export default {
 
       // open legendsEditor
       document.getElementById('burglLegend').addEventListener('click', function() {
-        let burg = +elSelected.attr('data-id')
+        let burg = +self.elSelected.attr('data-id')
         let id = 'burg' + burg
-        let name = manors[burg].name
+        let name = self.manors[burg].name
         editLegends(id, name)
       })
 
@@ -4004,24 +3973,24 @@ export default {
         const point = d3.mouse(this)
         const index = getIndex(point)
         const i = +$('#burgRelocate').attr('data-id')
-        if (isNaN(i) || !manors[i]) return
+        if (isNaN(i) || !self.manors[i]) return
 
-        if (cells[index].height < 20) {
+        if (self.cells[index].height < 20) {
           tip('Cannot place burg in the water! Select a land cell', null, 'error')
           return
         }
 
-        if (cells[index].manor !== undefined && cells[index].manor !== i) {
+        if (self.cells[index].manor !== undefined && self.cells[index].manor !== i) {
           tip('There is already a burg in this cell. Please select a free cell', null, 'error')
           $('#grid').fadeIn()
           d3.select('#toggleGrid').classed('buttonoff', false)
           return
         }
 
-        let region = cells[index].region
-        const oldRegion = manors[i].region
+        let region = self.cells[index].region
+        const oldRegion = self.manors[i].region
         // relocating capital to other country you "conquer" target cell
-        if (states[oldRegion] && states[oldRegion].capital === i) {
+        if (self.states[oldRegion] && self.states[oldRegion].capital === i) {
           if (region !== oldRegion) {
             tip('Capital cannot be moved to another country!', null, 'error')
             return
@@ -4051,29 +4020,29 @@ export default {
           const ya = _.round(y - size * 0.47, 2)
           anchor.attr('transform', null).attr('x', xa).attr('y', ya)
         }
-        cells[index].manor = i
-        cells[manors[i].cell].manor = undefined
-        manors[i].x = x, manors[i].y = y, manors[i].region = region, manors[i].cell = index
+        self.cells[index].manor = i
+        self.cells[self.manors[i].cell].manor = undefined
+        self.manors[i].x = x, self.manors[i].y = y, self.manors[i].region = region, self.manors[i].cell = index
       }
 
       // open in MFCG
       $('#burgSeeInMFCG').click(function() {
-        const id = +elSelected.attr('data-id')
-        const name = manors[id].name
-        const cell = manors[id].cell
-        const pop = Math.round(manors[id].population)
+        const id = +self.elSelected.attr('data-id')
+        const name = self.manors[id].name
+        const cell = self.manors[id].cell
+        const pop = Math.round(self.manors[id].population)
         const size = pop > 65 ? 65 : pop < 6 ? 6 : pop
-        const s = seed + '' + id
-        const hub = cells[cell].crossroad > 2 ? 1 : 0
-        const river = cells[cell].river ? 1 : 0
-        const coast = cells[cell].port !== undefined ? 1 : 0
+        const s = self.seed + '' + id
+        const hub = self.cells[cell].crossroad > 2 ? 1 : 0
+        const river = self.cells[cell].river ? 1 : 0
+        const coast = self.cells[cell].port !== undefined ? 1 : 0
         const sec = pop > 40 ? 1 : Math.random() < pop / 100 ? 1 : 0
         const thr = sec && Math.random() < 0.8 ? 1 : 0
         const url = 'http://fantasycities.watabou.ru/'
         let params = `?name=${name}&size=${size}&seed=${s}&hub=${hub}&random=0&continuous=0`
         params +=
           `&river=${river}&coast=${coast}&citadel=${id & 1}&plaza=${sec}&temple=${thr}&walls=${sec}&shantytown=${sec}`
-        const win = window.open(url + params, '_blank')
+        const win = window.open(url + self.params, '_blank')
         win.focus()
       })
 
@@ -4089,16 +4058,16 @@ export default {
           buttons: {
             Remove: function() {
               $(this).dialog('close')
-              const id = +elSelected.attr('data-id')
+              const id = +self.elSelected.attr('data-id')
               d3.selectAll('[data-id=\'' + id + '\']').remove()
-              const cell = manors[id].cell
-              const state = manors[id].region
-              if (states[state]) {
-                if (states[state].capital === id) states[state].capital = 'select'
-                states[state].burgs--
+              const cell = self.manors[id].cell
+              const state = self.manors[id].region
+              if (self.states[state]) {
+                if (self.states[state].capital === id) self.states[state].capital = 'select'
+                self.states[state].burgs--
               }
-              manors[id].region = 'removed'
-              cells[cell].manor = undefined
+              self.manors[id].region = 'removed'
+              self.cells[cell].manor = undefined
               closeDialogs('.stable')
               updateCountryEditors()
             },
@@ -4109,11 +4078,11 @@ export default {
     }
 
     function editMarker() {
-      if (customization) return
+      if (self.customization) return
 
       unselect()
       closeDialogs('#markerEditor, .stable')
-      elSelected =
+      self.elSelected =
         d3.select(this).call(d3.drag().on('start', elementDrag)).classed('draggable', true)
 
       $('#markerEditor').dialog({
@@ -4124,7 +4093,7 @@ export default {
       })
 
       // update inputs
-      let id = elSelected.attr('href')
+      let id = self.elSelected.attr('href')
       let symbol = d3.select('#defs-markers').select(id)
       let icon = symbol.select('text')
       markerSelectGroup.value = id.slice(1)
@@ -4134,7 +4103,7 @@ export default {
       markerIconFill.value = icon.attr('fill')
       markerIconStrokeWidth.value = icon.attr('stroke-width')
       markerIconStroke.value = icon.attr('stroke')
-      markerSize.value = elSelected.attr('data-size')
+      markerSize.value = self.elSelected.attr('data-size')
       markerBase.value = symbol.select('path').attr('fill')
       markerFill.value = symbol.select('circle').attr('fill')
       let opacity = symbol.select('circle').attr('opacity')
@@ -4147,8 +4116,8 @@ export default {
       if (selected.length) selected[0].className = 'selected'
       markerIconCustom.value = selected.length ? '' : icon.text()
 
-      if (modules.editMarker) return
-      modules.editMarker = true
+      if (self.modules.editMarker) return
+      self.modules.editMarker = true
 
       $('#markerGroup').click(function() {
         $('#markerEditor > button').not(this).toggle()
@@ -4163,7 +4132,7 @@ export default {
           opt.value = opt.innerHTML = this.id
           markerSelectGroup.add(opt)
         })
-        let id = elSelected.attr('href').slice(1)
+        let id = self.elSelected.attr('href').slice(1)
         markerSelectGroup.value = id
       }
 
@@ -4181,8 +4150,8 @@ export default {
 
       // on marker type change
       document.getElementById('markerSelectGroup').addEventListener('change', function() {
-        elSelected.attr('href', '#' + this.value)
-        elSelected.attr('data-id', '#' + this.value)
+        self.elSelected.attr('href', '#' + this.value)
+        self.elSelected.attr('data-id', '#' + this.value)
       })
 
       // on new type input
@@ -4195,11 +4164,11 @@ export default {
         }
         markerInputGroup.value = ''
         // clone old group assigning new id
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         let l = d3.select('#defs-markers').select(id).node().cloneNode(true)
         l.id = newGroup
-        elSelected.attr('href', '#' + newGroup)
-        elSelected.attr('data-id', '#' + newGroup)
+        self.elSelected.attr('href', '#' + newGroup)
+        self.elSelected.attr('data-id', '#' + newGroup)
         document.getElementById('defs-markers').insertBefore(l, null)
 
         // select new group
@@ -4218,7 +4187,7 @@ export default {
       })
 
       $('#markerRemoveGroup').click(function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         let used = document.querySelectorAll('use[data-id=\'' + id + '\']')
         let count = used.length === 1 ? '1 element' : used.length + ' elements'
         const message = 'Are you sure you want to remove the marker (' + count + ')?'
@@ -4259,7 +4228,7 @@ export default {
           let selected = table.getElementsByClassName('selected')
           if (selected.length) selected[0].removeAttribute('class')
           e.target.className = 'selected'
-          let id = elSelected.attr('href')
+          let id = self.elSelected.attr('href')
           let icon = e.target.innerHTML
           d3.select('#defs-markers').select(id).select('text').text(icon)
         }
@@ -4276,26 +4245,26 @@ export default {
 
       // change marker icon size
       document.getElementById('markerIconSize').addEventListener('input', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select('#defs-markers').select(id).select('text').attr('font-size', this.value + 'px')
       })
 
       // change marker icon x shift
       document.getElementById('markerIconShiftX').addEventListener('input', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select('#defs-markers').select(id).select('text').attr('x', this.value + '%')
       })
 
       // change marker icon y shift
       document.getElementById('markerIconShiftY').addEventListener('input', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select('#defs-markers').select(id).select('text').attr('y', this.value + '%')
       })
 
       // apply custom unicode icon on input
       document.getElementById('markerIconCustom').addEventListener('input', function() {
         if (!this.value) return
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select('#defs-markers').select(id).select('text').text(this.value)
       })
 
@@ -4306,7 +4275,7 @@ export default {
 
       // change marker size
       document.getElementById('markerSize').addEventListener('input', function() {
-        let id = elSelected.attr('data-id')
+        let id = self.elSelected.attr('data-id')
         let used = document.querySelectorAll('use[data-id=\'' + id + '\']')
         let size = this.value
         used.forEach(function(e) {e.setAttribute('data-size', size)})
@@ -4315,38 +4284,38 @@ export default {
 
       // change marker base color
       document.getElementById('markerBase').addEventListener('input', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select(id).select('path').attr('fill', this.value)
         d3.select(id).select('circle').attr('stroke', this.value)
       })
 
       // change marker fill color
       document.getElementById('markerFill').addEventListener('input', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select(id).select('circle').attr('fill', this.value)
       })
 
       // change marker icon y shift
       document.getElementById('markerIconFill').addEventListener('input', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select('#defs-markers').select(id).select('text').attr('fill', this.value)
       })
 
       // change marker icon y shift
       document.getElementById('markerIconStrokeWidth').addEventListener('input', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select('#defs-markers').select(id).select('text').attr('stroke-width', this.value)
       })
 
       // change marker icon y shift
       document.getElementById('markerIconStroke').addEventListener('input', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         d3.select('#defs-markers').select(id).select('text').attr('stroke', this.value)
       })
 
       // toggle marker bubble display
       document.getElementById('markerToggleBubble').addEventListener('click', function() {
-        let id = elSelected.attr('href')
+        let id = self.elSelected.attr('href')
         let show = 1
         if (this.className === 'icon-info-circled') {
           this.className = 'icon-info'
@@ -4361,8 +4330,8 @@ export default {
 
       // open legendsEditor
       document.getElementById('markerLegendButton').addEventListener('click', function() {
-        let id = elSelected.attr('id')
-        let symbol = elSelected.attr('href')
+        let id = self.elSelected.attr('id')
+        let symbol = self.elSelected.attr('href')
         let icon = d3.select('#defs-markers').select(symbol).select('text').text()
         let name = 'Marker ' + icon
         editLegends(id, name)
@@ -4381,7 +4350,7 @@ export default {
           buttons: {
             Remove: function() {
               $(this).dialog('close')
-              elSelected.remove()
+              self.elSelected.remove()
               $('#markerEditor').dialog('close')
             },
             Cancel: function() {$(this).dialog('close')}
@@ -4394,12 +4363,12 @@ export default {
     function unselect() {
       tip('', true)
       restoreDefaultEvents()
-      if (customization === 5) customization = 0
-      if (!elSelected) return
-      elSelected.call(d3.drag().on('drag', null)).attr('class', null)
+      if (self.customization === 5) self.customization = 0
+      if (!self.elSelected) return
+      self.elSelected.call(d3.drag().on('drag', null)).attr('class', null)
       debug.selectAll('*').remove()
       viewbox.style('cursor', 'default')
-      elSelected = null
+      self.elSelected = null
     }
 
     // transform string to array [translateX,translateY,rotateDeg,rotateX,rotateY,scale]
@@ -4420,8 +4389,8 @@ export default {
         const to = g === 'towns' ? $('#town-anchors') : $('#capital-anchors')
         el.detach().appendTo(to)
         const useSize = to.attr('size')
-        const x = _.round(manors[id].x - useSize * 0.47, 2)
-        const y = _.round(manors[id].y - useSize * 0.47, 2)
+        const x = _.round(self.manors[id].x - useSize * 0.47, 2)
+        const y = _.round(self.manors[id].y - useSize * 0.47, 2)
         el.attr('x', x).attr('y', y).attr('width', useSize).attr('height', useSize)
       }
       updateCountryEditors()
@@ -4451,7 +4420,7 @@ export default {
     // Assess cells geographycal suitability for settlement
     function rankPlacesGeography() {
       console.time('rankPlacesGeography')
-      land.map(function(c) {
+      self.land.map(function(c) {
         let score = 0
         c.flux = _.round(c.flux, 2)
         // get base score from height (will be biom)
@@ -4471,20 +4440,20 @@ export default {
           if (c.flux > 1) score += Math.pow(c.flux, 0.3) // riverbank is valued
           if (c.confluence) score += Math.pow(c.confluence, 0.7) // confluence is valued;
           const neighbEv = c.neighbors.map(
-            function(n) {if (cells[n].height >= 20) return cells[n].height})
+            function(n) {if (self.cells[n].height >= 20) return self.cells[n].height})
           const difEv = c.height - d3.mean(neighbEv)
           // if (!isNaN(difEv)) score += difEv * 10 * (1 - c.height / 100); // local height maximums are valued
         }
         c.score = _.round(Math.random() * score + score, 3) // add random factor
       })
-      land.sort(function(a, b) {return b.score - a.score})
+      self.land.sort(function(a, b) {return b.score - a.score})
       console.timeEnd('rankPlacesGeography')
     }
 
     // Assess the cells economical suitability for settlement
     function rankPlacesEconomy() {
       console.time('rankPlacesEconomy')
-      land.map(function(c) {
+      self.land.map(function(c) {
         let score = c.score
         let path = c.path || 0 // roads are valued
         if (path) {
@@ -4494,7 +4463,7 @@ export default {
         }
         c.score = _.round(Math.random() * score + score, 2) // add random factor
       })
-      land.sort(function(a, b) {return b.score - a.score})
+      self.land.sort(function(a, b) {return b.score - a.score})
       console.timeEnd('rankPlacesEconomy')
     }
 
@@ -4504,8 +4473,8 @@ export default {
       const ruralFactor = 0.5, urbanFactor = 0.9
 
       // calculate population for each burg (based on trade/people attractors)
-      manors.map(function(m) {
-        const cell = cells[m.cell]
+      self.manors.map(function(m) {
+        const cell = self.cells[m.cell]
         let score = cell.score
         if (score <= 0) {score = _.round(Math.random(), 2)}
         if (cell.crossroad) {score += cell.crossroad} // crossroads
@@ -4519,8 +4488,8 @@ export default {
       })
 
       // calculate rural population for each cell based on area + elevation (elevation to be changed to biome)
-      const graphSizeAdj = 90 / Math.sqrt(cells.length, 2) // adjust to different graphSize
-      land.map(function(l) {
+      const graphSizeAdj = 90 / Math.sqrt(self.cells.length, 2) // adjust to different graphSize
+      self.land.map(function(l) {
         let population = 0
         const elevationFactor = Math.pow(1 - l.height / 100, 3)
         population = elevationFactor * l.area * graphSizeAdj
@@ -4529,9 +4498,9 @@ export default {
       })
 
       // calculate population for each region
-      states.map(function(s, i) {
+      self.states.map(function(s, i) {
         // define region burgs count
-        const burgs = $.grep(manors, function(e) {
+        const burgs = $.grep(self.manors, function(e) {
           return e.region === i
         })
         s.burgs = burgs.length
@@ -4539,7 +4508,7 @@ export default {
         let burgsPop = 0 // get summ of all burgs population
         burgs.map(function(b) {burgsPop += b.population})
         s.urbanPopulation = _.round(burgsPop, 2)
-        const regionCells = $.grep(cells, function(e) {
+        const regionCells = $.grep(self.cells, function(e) {
           return e.region === i
         })
         let cellsPop = 0
@@ -4549,20 +4518,20 @@ export default {
       })
 
       // collect data for neutrals
-      const neutralCells = $.grep(cells, function(e) {return e.region === 'neutral'})
+      const neutralCells = $.grep(self.cells, function(e) {return e.region === 'neutral'})
       if (neutralCells.length) {
         let burgs = 0, urbanPopulation = 0, ruralPopulation = 0, area = 0
-        manors.forEach(function(m) {
+        self.manors.forEach(function(m) {
           if (m.region !== 'neutral') return
           urbanPopulation += m.population
           burgs++
         })
         neutralCells.forEach(function(c) {
           ruralPopulation += c.pop
-          area += cells[c.index].area
+          area += self.cells[c.index].area
         })
-        states.push({
-          i: states.length, color: 'neutral', name: 'Neutrals', capital: 'neutral',
+        self.states.push({
+          i: self.states.length, color: 'neutral', name: 'Neutrals', capital: 'neutral',
           cells: neutralCells.length, burgs, urbanPopulation: _.round(urbanPopulation, 2),
           ruralPopulation: _.round(ruralPopulation, 2), area: Math.round(area)
         })
@@ -4576,25 +4545,25 @@ export default {
       let spacing = (self.graphWidth + self.graphHeight) / 2 / count
       console.log(' states: ' + count)
 
-      for (let l = 0; manors.length < count; l++) {
-        const region = manors.length
-        const x = land[l].data[0], y = land[l].data[1]
+      for (let l = 0; self.manors.length < count; l++) {
+        const region = self.manors.length
+        const x = self.land[l].data[0], y = self.land[l].data[1]
         let minDist = 10000 // dummy value
-        for (let c = 0; c < manors.length; c++) {
-          const dist = Math.hypot(x - manors[c].x, y - manors[c].y)
+        for (let c = 0; c < self.manors.length; c++) {
+          const dist = Math.hypot(x - self.manors[c].x, y - self.manors[c].y)
           if (dist < minDist) minDist = dist
           if (minDist < spacing) break
         }
         if (minDist >= spacing) {
-          const cell = land[l].index
+          const cell = self.land[l].index
           const closest = self.cultureTree.find(x, y)
           const culture = getCultureId(closest)
-          manors.push({i: region, cell, x, y, region, culture})
+          self.manors.push({i: region, cell, x, y, region, culture})
         }
-        if (l === land.length - 1) {
+        if (l === self.land.length - 1) {
           console.error('Cannot place capitals with current spacing. Trying again with reduced spacing')
           l = -1
-          manors = []
+          self.manors = []
           spacing /= 1.2
         }
       }
@@ -4602,11 +4571,11 @@ export default {
       // For each capital create a country
       const scheme = count <= 8 ? colors8 : colors20
       const mod = +powerInput.value
-      manors.forEach(function(m, i) {
+      self.manors.forEach(function(m, i) {
         const power = _.round(Math.random() * mod / 2 + 1, 1)
         const color = scheme(i / count)
-        states.push({i, color, power, capital: i})
-        const p = cells[m.cell]
+        self.states.push({i, color, power, capital: i})
+        const p = self.cells[m.cell]
         p.manor = i
         p.region = i
         p.culture = m.culture
@@ -4619,19 +4588,19 @@ export default {
       const count = +manorsInput.value
       const neutral = +neutralInput.value
       const manorTree = d3.quadtree()
-      manors.forEach(function(m) {manorTree.add([m.x, m.y])})
+      self.manors.forEach(function(m) {manorTree.add([m.x, m.y])})
 
-      for (let l = 0; manors.length < count && l < land.length; l++) {
-        const x = land[l].data[0], y = land[l].data[1]
+      for (let l = 0; self.manors.length < count && l < self.land.length; l++) {
+        const x = self.land[l].data[0], y = self.land[l].data[1]
         const c = manorTree.find(x, y)
         const d = Math.hypot(x - c[0], y - c[1])
         if (d < 6) continue
-        const cell = land[l].index
+        const cell = self.land[l].index
         let region = 'neutral', culture = -1, closest = neutral
-        for (let c = 0; c < states.length; c++) {
-          let dist = Math.hypot(manors[c].x - x, manors[c].y - y) / states[c].power
-          const cap = manors[c].cell
-          if (cells[cell].fn !== cells[cap].fn) dist *= 3
+        for (let c = 0; c < self.states.length; c++) {
+          let dist = Math.hypot(self.manors[c].x - x, self.manors[c].y - y) / self.states[c].power
+          const cap = self.manors[c].cell
+          if (self.cells[cell].fn !== self.cells[cap].fn) dist *= 3
           if (dist < closest) {
             region = c
             closest = dist
@@ -4641,16 +4610,16 @@ export default {
           const closestCulture = self.cultureTree.find(x, y)
           culture = getCultureId(closestCulture)
         } else {
-          culture = manors[region].culture
+          culture = self.manors[region].culture
         }
-        land[l].manor = manors.length
-        land[l].culture = culture
-        land[l].region = region
-        manors.push({i: manors.length, cell, x, y, region, culture})
+        self.land[l].manor = self.manors.length
+        self.land[l].culture = culture
+        self.land[l].region = region
+        self.manors.push({i: self.manors.length, cell, x, y, region, culture})
         manorTree.add([x, y])
       }
-      if (manors.length < count) {
-        const error = 'Cannot place all burgs. Requested ' + count + ', placed ' + manors.length
+      if (self.manors.length < count) {
+        const error = 'Cannot place all burgs. Requested ' + count + ', placed ' + self.manors.length
         console.error(error)
       }
       console.timeEnd('locateTowns')
@@ -4658,16 +4627,16 @@ export default {
 
     // shift settlements from cell point
     function shiftSettlements() {
-      for (let i = 0; i < manors.length; i++) {
+      for (let i = 0; i < self.manors.length; i++) {
         const capital = i < regionsInput.value
-        const cell = cells[manors[i].cell]
-        let x = manors[i].x, y = manors[i].y
+        const cell = self.cells[self.manors[i].cell]
+        let x = self.manors[i].x, y = self.manors[i].y
         if ((capital && cell.harbor) || cell.harbor === 1) {
           // port: capital with any harbor and towns with good harbors
           if (cell.haven === undefined) {
             cell.harbor = undefined
           } else {
-            cell.port = cells[cell.haven].fn
+            cell.port = self.cells[cell.haven].fn
             x = cell.coastX
             y = cell.coastY
           }
@@ -4681,24 +4650,24 @@ export default {
           shift = Math.random() > .5 ? shift : shift * -1
           y = _.round(y + shift, 2)
         }
-        cell.data[0] = manors[i].x = x
-        cell.data[1] = manors[i].y = y
+        cell.data[0] = self.manors[i].x = x
+        cell.data[1] = self.manors[i].y = y
       }
     }
 
     // Validate each island with manors has port
     function checkAccessibility() {
       console.time('checkAccessibility')
-      for (let f = 0; f < features.length; f++) {
-        if (!features[f].land) continue
-        const manorsOnIsland = $.grep(land, function(e) {
+      for (let f = 0; f < self.features.length; f++) {
+        if (!self.features[f].land) continue
+        const manorsOnIsland = $.grep(self.land, function(e) {
           return e.manor !== undefined && e.fn === f
         })
         if (!manorsOnIsland.length) continue
 
         // if lake port is the only port on lake, remove port
         const lakePorts = $.grep(manorsOnIsland, function(p) {
-          return p.port && !features[p.port].border
+          return p.port && !self.features[p.port].border
         })
         if (lakePorts.length) {
           const lakes = []
@@ -4708,18 +4677,18 @@ export default {
 
         // check how many ocean ports are there on island
         const oceanPorts = $.grep(manorsOnIsland, function(p) {
-          return p.port && features[p.port].border
+          return p.port && self.features[p.port].border
         })
         if (oceanPorts.length) continue
         const portCandidates = $.grep(manorsOnIsland, function(c) {
-          return c.harbor && features[cells[c.harbor].fn].border && c.ctype === 1
+          return c.harbor && self.features[self.cells[c.harbor].fn].border && c.ctype === 1
         })
         if (portCandidates.length) {
           // No ports on island. Upgrading first burg to port
           const candidate = portCandidates[0]
           candidate.harbor = 1
-          candidate.port = cells[candidate.haven].fn
-          const manor = manors[portCandidates[0].manor]
+          candidate.port = self.cells[candidate.haven].fn
+          const manor = self.manors[portCandidates[0].manor]
           candidate.data[0] = manor.x = candidate.coastX
           candidate.data[1] = manor.y = candidate.coastY
           // add score for each burg on island (as it's the only port)
@@ -4735,10 +4704,10 @@ export default {
     function generateMainRoads() {
       console.time('generateMainRoads')
       lineGen.curve(d3.curveBasis)
-      if (states.length < 2 || manors.length < 2) return
-      for (let f = 0; f < features.length; f++) {
-        if (!features[f].land) continue
-        const manorsOnIsland = $.grep(land,
+      if (self.states.length < 2 || self.manors.length < 2) return
+      for (let f = 0; f < self.features.length; f++) {
+        if (!self.features[f].land) continue
+        const manorsOnIsland = $.grep(self.land,
           function(e) {return e.manor !== undefined && e.fn === f})
         if (manorsOnIsland.length > 1) {
           for (let d = 1; d < manorsOnIsland.length; d++) {
@@ -4755,14 +4724,14 @@ export default {
     // add roads from port to capital if capital is not a port
     function generatePortRoads() {
       console.time('generatePortRoads')
-      if (!states.length || manors.length < 2) return
+      if (!self.states.length || self.manors.length < 2) return
       const portless = []
-      for (let s = 0; s < states.length; s++) {
-        const cell = manors[s].cell
-        if (cells[cell].port === undefined) portless.push(s)
+      for (let s = 0; s < self.states.length; s++) {
+        const cell = self.manors[s].cell
+        if (self.cells[cell].port === undefined) portless.push(s)
       }
       for (let l = 0; l < portless.length; l++) {
-        const ports = $.grep(land,
+        const ports = $.grep(self.land,
           function(l) {return l.port !== undefined && l.region === portless[l]})
         if (!ports.length) continue
         let minDist = 1000, end = -1
@@ -4774,7 +4743,7 @@ export default {
           }
         })
         if (end !== -1) {
-          const start = manors[portless[l]].cell
+          const start = self.manors[portless[l]].cell
           const path = findLandPath(start, end, 'direct')
           restorePath(end, start, 'main', path)
         }
@@ -4784,9 +4753,9 @@ export default {
 
     function generateSmallRoads() {
       console.time('generateSmallRoads')
-      if (manors.length < 2) return
-      for (let f = 0; f < features.length; f++) {
-        const manorsOnIsland = $.grep(land, function(e) {
+      if (self.manors.length < 2) return
+      for (let f = 0; f < self.features.length; f++) {
+        const manorsOnIsland = $.grep(self.land, function(e) {
           return e.manor !== undefined && e.fn === f
         })
         const l = manorsOnIsland.length
@@ -4795,8 +4764,8 @@ export default {
           for (let s = 0; s < secondary; s++) {
             var start = manorsOnIsland[Math.floor(Math.random() * l)].index
             var end = manorsOnIsland[Math.floor(Math.random() * l)].index
-            var dist = Math.hypot(cells[start].data[0] - cells[end].data[0],
-              cells[start].data[1] - cells[end].data[1])
+            var dist = Math.hypot(self.cells[start].data[0] - self.cells[end].data[0],
+              self.cells[start].data[1] - self.cells[end].data[1])
             if (dist > 10) {
               var path = findLandPath(start, end, 'direct')
               restorePath(end, start, 'small', path)
@@ -4806,7 +4775,7 @@ export default {
             if (!e.path && d > 0) {
               const start = e.index
               let end = -1
-              const road = $.grep(land, function(e) {
+              const road = $.grep(self.land, function(e) {
                 return e.path && e.fn === f
               })
               if (road.length > 0) {
@@ -4840,18 +4809,18 @@ export default {
 
       const ports = []
       // groups all ports on water feature
-      for (let m = 0; m < manors.length; m++) {
-        const cell = manors[m].cell
-        const port = cells[cell].port
+      for (let m = 0; m < self.manors.length; m++) {
+        const cell = self.manors[m].cell
+        const port = self.cells[cell].port
         if (port === undefined) continue
         if (ports[port] === undefined) ports[port] = []
         ports[port].push(cell)
 
         // draw anchor icon
-        const group = m < states.length ? cAnchors : tAnchors
-        const size = m < states.length ? cSize : tSize
-        const x = _.round(cells[cell].data[0] - size * 0.47, 2)
-        const y = _.round(cells[cell].data[1] - size * 0.47, 2)
+        const group = m < self.states.length ? cAnchors : tAnchors
+        const size = m < self.states.length ? cSize : tSize
+        const x = _.round(self.cells[cell].data[0] - size * 0.47, 2)
+        const y = _.round(self.cells[cell].data[1] - size * 0.47, 2)
         group.append('use').attr('xlink:href', '#icon-anchor').attr('data-id', m)
              .attr('x', x).attr('y', y).attr('width', size).attr('height', size)
         icons.selectAll('use').on('click', editIcon)
@@ -4863,7 +4832,7 @@ export default {
         const onIsland = []
         for (let i = 0; i < ports[w].length; i++) {
           const cell = ports[w][i]
-          const fn = cells[cell].fn
+          const fn = self.cells[cell].fn
           if (onIsland[fn] === undefined) onIsland[fn] = []
           onIsland[fn].push(cell)
         }
@@ -4889,18 +4858,18 @@ export default {
             }
           }
 
-          if (features[w].border && !features[fn].border && onIsland[fn].length > 5) {
+          if (self.features[w].border && !self.features[fn].border && onIsland[fn].length > 5) {
             // encircle the island
-            onIsland[fn].sort(function(a, b) {return cells[b].cost - cells[a].cost})
+            onIsland[fn].sort(function(a, b) {return self.cells[b].cost - self.cells[a].cost})
             for (let a = 2; a < onIsland[fn].length && a < 10; a++) {
               const from = onIsland[fn][1], to = onIsland[fn][a]
-              const dist = Math.hypot(cells[from].data[0] - cells[to].data[0],
-                cells[from].data[1] - cells[to].data[1])
+              const dist = Math.hypot(self.cells[from].data[0] - self.cells[to].data[0],
+                self.cells[from].data[1] - self.cells[to].data[1])
               const distPath = getPathDist(from, to)
               if (distPath > dist * 4 + 10) {
-                const totalCost = cells[from].cost + cells[to].cost
+                const totalCost = self.cells[from].cost + self.cells[to].cost
                 const pathsAdd = findOceanPaths(from, to)
-                if (cells[to].cost < totalCost) {
+                if (self.cells[to].cost < totalCost) {
                   restorePath(to, from, 'ocean', pathsAdd)
                   break
                 }
@@ -4928,26 +4897,26 @@ export default {
       while (queue.length > 0) {
         const next = queue.dequeue().e
         if (next === end) {break}
-        const pol = cells[next]
+        const pol = self.cells[next]
         pol.neighbors.forEach(function(e) {
-          if (cells[e].height >= 20) {
-            let cost = cells[e].height / 100 * 2
-            if (cells[e].path && type === 'main') {
+          if (self.cells[e].height >= 20) {
+            let cost = self.cells[e].height / 100 * 2
+            if (self.cells[e].path && type === 'main') {
               cost = 0.15
             } else {
               if (typeof e.manor === 'undefined') {cost += 0.1}
               if (typeof e.river !== 'undefined') {cost -= 0.1}
-              if (cells[e].harbor) {cost *= 0.3}
-              if (cells[e].path) {cost *= 0.5}
+              if (self.cells[e].harbor) {cost *= 0.3}
+              if (self.cells[e].path) {cost *= 0.5}
               cost +=
-                Math.hypot(cells[e].data[0] - pol.data[0], cells[e].data[1] - pol.data[1]) / 30
+                Math.hypot(self.cells[e].data[0] - pol.data[0], self.cells[e].data[1] - pol.data[1]) / 30
             }
             const costNew = costTotal[next] + cost
             if (!cameFrom[e] || costNew < costTotal[e]) { //
               costTotal[e] = costNew
               cameFrom[e] = next
-              const dist = Math.hypot(cells[e].data[0] - cells[end].data[0],
-                cells[e].data[1] - cells[end].data[1]) / 15
+              const dist = Math.hypot(self.cells[e].data[0] - self.cells[end].data[0],
+                self.cells[e].data[1] - self.cells[end].data[1]) / 15
               const priority = costNew + dist
               queue.queue({e, p: priority})
             }
@@ -4965,21 +4934,21 @@ export default {
       queue.queue({e: start, p: 0})
       while (queue.length > 0 && next !== end) {
         next = queue.dequeue().e
-        const pol = cells[next]
+        const pol = self.cells[next]
         pol.neighbors.forEach(function(e) {
-          if (cells[e].ctype < 0 || cells[e].haven === next) {
+          if (self.cells[e].ctype < 0 || self.cells[e].haven === next) {
             let cost = 1
-            if (cells[e].ctype > 0) cost += 100
-            if (cells[e].ctype < -1) {
-              const dist = Math.hypot(cells[e].data[0] - pol.data[0],
-                cells[e].data[1] - pol.data[1])
+            if (self.cells[e].ctype > 0) cost += 100
+            if (self.cells[e].ctype < -1) {
+              const dist = Math.hypot(self.cells[e].data[0] - pol.data[0],
+                self.cells[e].data[1] - pol.data[1])
               cost += 50 + dist * 2
             }
-            if (cells[e].path && cells[e].ctype < 0) cost *= 0.8
+            if (self.cells[e].path && self.cells[e].ctype < 0) cost *= 0.8
             const costNew = costTotal[next] + cost
             if (!cameFrom[e]) {
               costTotal[e] = costNew
-              cells[e].cost = costNew
+              self.cells[e].cost = costNew
               cameFrom[e] = next
               queue.queue({e, p: costNew})
             }
@@ -5003,10 +4972,10 @@ export default {
       queue.queue({e: start, p: 0})
       while (queue.length > 0 && next !== end) {
         next = queue.dequeue().e
-        const pol = cells[next]
+        const pol = self.cells[next]
         pol.neighbors.forEach(function(e) {
-          if (cells[e].path && (cells[e].ctype === -1 || cells[e].haven === next)) {
-            const dist = Math.hypot(cells[e].data[0] - pol.data[0], cells[e].data[1] - pol.data[1])
+          if (self.cells[e].path && (self.cells[e].ctype === -1 || self.cells[e].haven === next)) {
+            const dist = Math.hypot(self.cells[e].data[0] - pol.data[0], self.cells[e].data[1] - pol.data[1])
             costNew = costTotal[next] + dist
             if (!cameFrom[e]) {
               costTotal[e] = costNew
@@ -5022,14 +4991,14 @@ export default {
     function restorePath(end, start, type, from) {
       let path = [], current = end
       const limit = 1000
-      let prev = cells[end]
+      let prev = self.cells[end]
       if (type === 'ocean' || !prev.path) {
         path.push({scX: prev.data[0], scY: prev.data[1], i: end})
       }
       if (!prev.path) {prev.path = 1}
       for (let i = 0; i < limit; i++) {
         current = from[current]
-        let cur = cells[current]
+        let cur = self.cells[current]
         if (!cur) {break}
         if (cur.path) {
           cur.path += 1
@@ -5051,12 +5020,12 @@ export default {
           // mark crossroades
           if (type === 'main' || type === 'small') {
             const plus = type === 'main' ? 4 : 2
-            const f = cells[path[0].i]
+            const f = self.cells[path[0].i]
             if (f.path > 1) {
               if (!f.crossroad) {f.crossroad = 0}
               f.crossroad += plus
             }
-            const t = cells[(path[path.length - 1].i)]
+            const t = self.cells[(path[path.length - 1].i)]
             if (t.path > 1) {
               if (!t.crossroad) {t.crossroad = 0}
               t.crossroad += plus
@@ -5096,12 +5065,12 @@ export default {
       townIcons.selectAll('*').remove()
       townLabels.selectAll('*').remove()
 
-      for (let i = 0; i < manors.length; i++) {
-        const x = manors[i].x, y = manors[i].y
-        const name = manors[i].name
-        const ic = i < states.length ? capitalIcons : townIcons
-        const lb = i < states.length ? capitalLabels : townLabels
-        const size = i < states.length ? capitalSize : townSize
+      for (let i = 0; i < self.manors.length; i++) {
+        const x = self.manors[i].x, y = self.manors[i].y
+        const name = self.manors[i].name
+        const ic = i < self.states.length ? capitalIcons : townIcons
+        const lb = i < self.states.length ? capitalLabels : townLabels
+        const size = i < self.states.length ? capitalSize : townSize
         ic.append('circle').attr('id', 'burg' + i).attr('data-id', i).attr('cx', x).attr('cy', y)
           .attr('r', size).on('click', editBurg)
         lb.append('text').attr('data-id', i).attr('x', x).attr('y', y).attr('dy', '-0.35em')
@@ -5117,15 +5086,15 @@ export default {
       if (namesInput.value === '1') {
         const request = new XMLHttpRequest()
         const url = 'https://archivist.xalops.com/archivist-core/api/name/settlement?count='
-        request.open('GET', url + manors.length, true)
+        request.open('GET', url + self.manors.length, true)
         request.onload = function() {
           const names = JSON.parse(request.responseText)
-          for (let i = 0; i < manors.length; i++) {
-            manors[i].name = names[i]
+          for (let i = 0; i < self.manors.length; i++) {
+            self.manors[i].name = names[i]
             burgLabels.select('[data-id=\'' + i + '\']').text(names[i])
-            if (i < states.length) {
-              states[i].name = generateStateName(i)
-              labels.select('#countries').select('#regionLabel' + i).text(states[i].name)
+            if (i < self.states.length) {
+              self.states[i].name = generateStateName(i)
+              labels.select('#countries').select('#regionLabel' + i).text(self.states[i].name)
             }
           }
           console.log(names)
@@ -5134,10 +5103,10 @@ export default {
       }
 
       if (namesInput.value !== '0') return
-      for (let i = 0; i < manors.length; i++) {
-        const culture = manors[i].culture
-        manors[i].name = generateName(culture)
-        if (i < states.length) states[i].name = generateStateName(i)
+      for (let i = 0; i < self.manors.length; i++) {
+        const culture = self.manors[i].culture
+        self.manors[i].name = generateName(culture)
+        if (i < self.states.length) self.states[i].name = generateStateName(i)
       }
       console.timeEnd('getNames')
     }
@@ -5246,20 +5215,20 @@ export default {
     function defineRegions(withCultures) {
       console.time('defineRegions')
       const manorTree = d3.quadtree()
-      manors.forEach(function(m) {if (m.region !== 'removed') manorTree.add([m.x, m.y])})
+      self.manors.forEach(function(m) {if (m.region !== 'removed') manorTree.add([m.x, m.y])})
 
       const neutral = +neutralInput.value
-      land.forEach(function(i) {
-        if (i.manor !== undefined && manors[i.manor].region !== 'removed') {
-          i.region = manors[i.manor].region
-          if (withCultures && manors[i.manor].culture !== undefined) i.culture =
-            manors[i.manor].culture
+      self.land.forEach(function(i) {
+        if (i.manor !== undefined && self.manors[i.manor].region !== 'removed') {
+          i.region = self.manors[i.manor].region
+          if (withCultures && self.manors[i.manor].culture !== undefined) i.culture =
+            self.manors[i.manor].culture
           return
         }
         const x = i.data[0], y = i.data[1]
 
         let dist = 100000, manor = null
-        if (manors.length) {
+        if (self.manors.length) {
           const c = manorTree.find(x, y)
           dist = Math.hypot(c[0] - x, c[1] - y)
           manor = getManorId(c)
@@ -5271,12 +5240,12 @@ export default {
             i.culture = getCultureId(closestCulture)
           }
         } else {
-          const cell = manors[manor].cell
-          if (cells[cell].fn !== i.fn) {
+          const cell = self.manors[manor].cell
+          if (self.cells[cell].fn !== i.fn) {
             let minDist = dist * 3
-            land.forEach(function(l) {
+            self.land.forEach(function(l) {
               if (l.fn === i.fn && l.manor !== undefined) {
-                if (manors[l.manor].region === 'removed') return
+                if (self.manors[l.manor].region === 'removed') return
                 const distN = Math.hypot(l.data[0] - x, l.data[1] - y)
                 if (distN < minDist) {
                   minDist = distN
@@ -5285,8 +5254,8 @@ export default {
               }
             })
           }
-          i.region = manors[manor].region
-          if (withCultures) i.culture = manors[manor].culture
+          i.region = self.manors[manor].region
+          if (withCultures) i.culture = self.manors[manor].culture
         }
       })
       console.timeEnd('defineRegions')
@@ -5299,11 +5268,11 @@ export default {
 
       // arrays to store edge data
       const edges = [], coastalEdges = [], borderEdges = [], neutralEdges = []
-      for (let a = 0; a < states.length; a++) {
+      for (let a = 0; a < self.states.length; a++) {
         edges[a] = []
         coastalEdges[a] = []
       }
-      const e = diagram.edges
+      const e = self.diagram.edges
       for (let i = 0; i < e.length; i++) {
         if (e[i] === undefined) continue
         const start = e[i][0].join(' ')
@@ -5311,20 +5280,20 @@ export default {
         const p = {start, end}
         if (e[i].left === undefined) {
           const r = e[i].right.index
-          const rr = cells[r].region
+          const rr = self.cells[r].region
           if (Number.isInteger(rr)) edges[rr].push(p)
           continue
         }
         if (e[i].right === undefined) {
           const l = e[i].left.index
-          const lr = cells[l].region
+          const lr = self.cells[l].region
           if (Number.isInteger(lr)) edges[lr].push(p)
           continue
         }
         const l = e[i].left.index
         const r = e[i].right.index
-        const lr = cells[l].region
-        const rr = cells[r].region
+        const lr = self.cells[l].region
+        const rr = self.cells[r].region
         if (lr === rr) continue
         if (Number.isInteger(lr)) {
           edges[lr].push(p)
@@ -5383,21 +5352,21 @@ export default {
         path += lineGen(edgesOrdered) + 'Z '
         array[array.length] = edgesOrdered.map(function(e) {return [+e.scX, +e.scY]})
       }
-      const color = states[region].color
+      const color = self.states[region].color
       regions.append('path').attr('d', round(path, 1)).attr('fill', color)
              .attr('class', 'region' + region)
       array.sort(function(a, b) {return b.length - a.length})
-      let capital = states[region].capital
+      let capital = self.states[region].capital
       // add capital cell as a hole
       if (!isNaN(capital)) {
-        const capitalCell = manors[capital].cell
-        array.push(polygons[capitalCell])
+        const capitalCell = self.manors[capital].cell
+        array.push(self.polygons[capitalCell])
       }
-      const name = states[region].name
+      const name = self.states[region].name
       const c = polylabel(array, 1.0) // pole of inaccessibility
       labels.select('#countries').append('text').attr('id', 'regionLabel' + region)
             .attr('x', Math.round(c[0])).attr('y', Math.round(c[1])).text(name).on('click', editLabel)
-      states[region].area = Math.round(Math.abs(d3.polygonArea(array[0]))) // define region area
+      self.states[region].area = Math.round(Math.abs(d3.polygonArea(array[0]))) // define region area
     }
 
     function drawRegionCoast(edges, region) {
@@ -5428,7 +5397,7 @@ export default {
         }
         path += lineGen(edgesOrdered)
       }
-      const color = states[region].color
+      const color = self.states[region].color
       regions.append('path').attr('d', round(path, 1)).attr('fill', 'none').attr('stroke', color)
              .attr('stroke-width', 5).attr('class', 'region' + region)
     }
@@ -5469,8 +5438,8 @@ export default {
     // generate region name
     function generateStateName(state) {
       let culture = null
-      if (states[state]) if (manors[states[state].capital]) culture =
-        manors[states[state].capital].culture
+      if (self.states[state]) if (self.manors[self.states[state].capital]) culture =
+        self.manors[self.states[state].capital].culture
       let name = 'NameIdontWant'
       if (Math.random() < 0.85 || culture === null) {
         // culture is random if capital is not yet defined
@@ -5480,7 +5449,7 @@ export default {
           name = generateName(culture)
         }
       } else {
-        name = manors[state].name
+        name = self.manors[state].name
       }
       const base = self.cultures[culture].base
 
@@ -5553,9 +5522,9 @@ export default {
     function recalculateCultures(fullRedraw) {
       console.time('recalculateCultures')
       // For each capital find closest culture and assign it to capital
-      states.forEach(function(s) {
+      self.states.forEach(function(s) {
         if (s.capital === 'neutral' || s.capital === 'select') return
-        const capital = manors[s.capital]
+        const capital = self.manors[s.capital]
         const c = self.cultureTree.find(capital.x, capital.y)
         capital.culture = getCultureId(c)
       })
@@ -5564,7 +5533,7 @@ export default {
       // assign closest culture to the town; else assign capital's culture
       const manorTree = d3.quadtree()
       const neutral = +neutralInput.value
-      manors.forEach(function(m) {
+      self.manors.forEach(function(m) {
         if (m.region === 'removed') return
         manorTree.add([m.x, m.y])
         if (m.region === 'neutral') {
@@ -5572,11 +5541,11 @@ export default {
           m.culture = getCultureId(culture)
           return
         }
-        const c = states[m.region].capital
+        const c = self.states[m.region].capital
         if (c !== 'neutral' && c !== 'select') {
-          const dist = Math.hypot(m.x - manors[c].x, m.y - manors[c].y)
+          const dist = Math.hypot(m.x - self.manors[c].x, m.y - self.manors[c].y)
           if (dist <= neutral / 5) {
-            m.culture = manors[c].culture
+            m.culture = self.manors[c].culture
             return
           }
         }
@@ -5587,7 +5556,7 @@ export default {
       // For each land cell if distance to closest manor > neutral / 2,
       // assign closest culture to the cell; else assign manors's culture
       const changed = []
-      land.forEach(function(i) {
+      self.land.forEach(function(i) {
         const x = i.data[0], y = i.data[1]
         const c = manorTree.find(x, y)
         const culture = i.culture
@@ -5597,12 +5566,12 @@ export default {
           const closestCulture = self.cultureTree.find(i.data[0], i.data[1])
           i.culture = getCultureId(closestCulture)
         } else {
-          const cell = manors[manor].cell
-          if (cells[cell].fn !== i.fn) {
+          const cell = self.manors[manor].cell
+          if (self.cells[cell].fn !== i.fn) {
             let minDist = dist * 3
-            land.forEach(function(l) {
+            self.land.forEach(function(l) {
               if (l.fn === i.fn && l.manor !== undefined) {
-                if (manors[l.manor].region === 'removed') return
+                if (self.manors[l.manor].region === 'removed') return
                 const distN = Math.hypot(l.data[0] - x, l.data[1] - y)
                 if (distN < minDist) {
                   minDist = distN
@@ -5611,7 +5580,7 @@ export default {
               }
             })
           }
-          i.culture = manors[manor].culture
+          i.culture = self.manors[manor].culture
         }
         // re-color cells
         if (i.culture !== culture || fullRedraw) {
@@ -5632,48 +5601,48 @@ export default {
 
     // get manor Id from center coordinates
     function getManorId(c) {
-      for (let i = 0; i < manors.length; i++) {
-        if (manors[i].x === c[0]) if (manors[i].y === c[1]) return i
+      for (let i = 0; i < self.manors.length; i++) {
+        if (self.manors[i].x === c[0]) if (self.manors[i].y === c[1]) return i
       }
     }
 
     // focus on coorditanes, cell or burg provided in searchParams
     function focusOn() {
-      if (params.get('from') === 'MFCG') {
+      if (self.params.get('from') === 'MFCG') {
         // focus on burg from MFCG
         findBurgForMFCG()
         return
       }
-      let s = params.get('scale') || 8
-      let x = params.get('x')
-      let y = params.get('y')
-      let c = params.get('cell')
+      let s = self.params.get('scale') || 8
+      let x = self.params.get('x')
+      let y = self.params.get('y')
+      let c = self.params.get('cell')
       if (c !== null) {
-        x = cells[+c].data[0]
-        y = cells[+c].data[1]
+        x = self.cells[+c].data[0]
+        y = self.cells[+c].data[1]
       }
-      let b = params.get('burg')
+      let b = self.params.get('burg')
       if (b !== null) {
-        x = manors[+b].x
-        y = manors[+b].y
+        x = self.manors[+b].x
+        y = self.manors[+b].y
       }
       if (x !== null && y !== null) zoomTo(x, y, s, 1600)
     }
 
     // find burg from MFCG and focus on it
     function findBurgForMFCG() {
-      if (!manors.length) {
+      if (!self.manors.length) {
         console.error('No burgs generated. Cannot select a burg for MFCG')
         return
       }
-      const size = +params.get('size')
-      let coast = +params.get('coast')
-      let port = +params.get('port')
-      let river = +params.get('river')
+      const size = +self.params.get('size')
+      let coast = +self.params.get('coast')
+      let port = +self.params.get('port')
+      let river = +self.params.get('river')
       let selection = defineSelection(coast, port, river)
       if (!selection.length) selection = defineSelection(coast, !port, !river)
       if (!selection.length) selection = defineSelection(!coast, 0, !river)
-      if (!selection.length) selection = manors[0] // select first if nothing is found
+      if (!selection.length) selection = self.manors[0] // select first if nothing is found
       if (!selection.length) {
         console.error('Cannot find a burg for MFCG')
         return
@@ -5681,16 +5650,16 @@ export default {
 
       function defineSelection(coast, port, river) {
         let selection = []
-        if (port && river) selection = $.grep(manors,
-          function(e) {return cells[e.cell].port !== undefined && cells[e.cell].river !== undefined})
-        else if (!port && coast && river) selection = $.grep(manors,
-          function(e) {return cells[e.cell].port === undefined && cells[e.cell].ctype === 1 && cells[e.cell].river !== undefined})
-        else if (!coast && !river) selection = $.grep(manors,
-          function(e) {return cells[e.cell].ctype !== 1 && cells[e.cell].river === undefined})
-        else if (!coast && river) selection = $.grep(manors,
-          function(e) {return cells[e.cell].ctype !== 1 && cells[e.cell].river !== undefined})
-        else if (coast && !river) selection = $.grep(manors,
-          function(e) {return cells[e.cell].ctype === 1 && cells[e.cell].river === undefined})
+        if (port && river) selection = $.grep(self.manors,
+          function(e) {return self.cells[e.cell].port !== undefined && self.cells[e.cell].river !== undefined})
+        else if (!port && coast && river) selection = $.grep(self.manors,
+          function(e) {return self.cells[e.cell].port === undefined && self.cells[e.cell].ctype === 1 && self.cells[e.cell].river !== undefined})
+        else if (!coast && !river) selection = $.grep(self.manors,
+          function(e) {return self.cells[e.cell].ctype !== 1 && self.cells[e.cell].river === undefined})
+        else if (!coast && river) selection = $.grep(self.manors,
+          function(e) {return self.cells[e.cell].ctype !== 1 && self.cells[e.cell].river !== undefined})
+        else if (coast && !river) selection = $.grep(self.manors,
+          function(e) {return self.cells[e.cell].ctype === 1 && self.cells[e.cell].river === undefined})
         return selection
       }
 
@@ -5698,7 +5667,7 @@ export default {
       const selected = d3.scan(selection,
         function(a, b) {return Math.abs(a.population - size) - Math.abs(b.population - size)})
       const burg = selection[selected].i
-      if (size && burg !== undefined) {manors[burg].population = size} else {return}
+      if (size && burg !== undefined) {self.manors[burg].population = size} else {return}
 
       // focus on found burg
       const label = burgLabels.select('[data-id=\'' + burg + '\']')
@@ -5706,7 +5675,7 @@ export default {
         console.error('Cannot find a label for MFCG burg ' + burg)
         return
       }
-      tip('Here stands the glorious city of ' + manors[burg].name, true)
+      tip('Here stands the glorious city of ' + self.manors[burg].name, true)
       label.classed('drag', true).on('mouseover', function() {
         d3.select(this).classed('drag', false)
         tip('', true)
@@ -5718,10 +5687,10 @@ export default {
     // draw Cultures
     function toggleCultures() {
       if (cults.selectAll('path').size() == 0) {
-        land.map(function(i) {
+        self.land.map(function(i) {
           const color = self.cultures[i.culture].color
           cults.append('path')
-               .attr('d', 'M' + polygons[i.index].join('L') + 'Z')
+               .attr('d', 'M' + self.polygons[i.index].join('L') + 'Z')
                .attr('id', 'cult' + i.index)
                .attr('fill', color)
                .attr('stroke', color)
@@ -5734,7 +5703,7 @@ export default {
     // clean data to get rid of redundand info
     function cleanData() {
       console.time('cleanData')
-      cells.map(function(c) {
+      self.cells.map(function(c) {
         delete c.cost
         delete c.used
         delete c.coastX
@@ -5776,9 +5745,9 @@ export default {
     function toggleFlux() {
       const colorFlux = d3.scaleSequential(d3chromatic.interpolateBlues)
       if (terrs.selectAll('path').size() == 0) {
-        land.map(function(i) {
+        self.land.map(function(i) {
           terrs.append('path')
-               .attr('d', 'M' + polygons[i.index].join('L') + 'Z')
+               .attr('d', 'M' + self.polygons[i.index].join('L') + 'Z')
                .attr('fill', colorFlux(0.1 + i.flux))
                .attr('stroke', colorFlux(0.1 + i.flux))
         })
@@ -5797,25 +5766,25 @@ export default {
       const forests = terrain.select('#forests')
       terrain.selectAll('g').selectAll('g').remove()
       // sort the land to Draw the top element first (reduce the elements overlapping)
-      land.sort(compareY)
-      for (let i = 0; i < land.length; i++) {
-        if (land[i].river) continue // no icons on rivers
-        const cell = land[i].index
-        const p = d3.polygonCentroid(polygons[cell]) // polygon centroid point
+      self.land.sort(compareY)
+      for (let i = 0; i < self.land.length; i++) {
+        if (self.land[i].river) continue // no icons on rivers
+        const cell = self.land[i].index
+        const p = d3.polygonCentroid(self.polygons[cell]) // polygon centroid point
         if (p === undefined) continue // something is wrong with data
-        const height = land[i].height
-        const area = land[i].area
+        const height = self.land[i].height
+        const area = self.land[i].area
         if (height >= 70) {
           // mount icon
           h = (height - 55) * 0.12
           for (let c = 0, a = area; Math.random() < a / 50; c++, a -= 50) {
-            if (polygons[cell][c] === undefined) break
+            if (self.polygons[cell][c] === undefined) break
             const g = mounts.append('g').attr('data-cell', cell)
             if (c < 2) {
               cx = p[0] - h / 100 * (1 - c / 10) - c * 2
               cy = p[1] + h / 400 + c
             } else {
-              const p2 = polygons[cell][c]
+              const p2 = self.polygons[cell][c]
               cx = (p[0] * 1.2 + p2[0] * 0.8) / 2
               cy = (p[1] * 1.2 + p2[1] * 0.8) / 2
             }
@@ -5834,14 +5803,14 @@ export default {
           h = (height - 40) / 10
           if (h > 1.7) h = 1.7
           for (let c = 0, a = area; Math.random() < a / 30; c++, a -= 30) {
-            if (land[i].ctype === 1 && c > 0) break
-            if (polygons[cell][c] === undefined) break
+            if (self.land[i].ctype === 1 && c > 0) break
+            if (self.polygons[cell][c] === undefined) break
             const g = hills.append('g').attr('data-cell', cell)
             if (c < 2) {
               cx = p[0] - h - c * 1.2
               cy = p[1] + h / 4 + c / 1.6
             } else {
-              const p2 = polygons[cell][c]
+              const p2 = self.polygons[cell][c]
               cx = (p[0] * 1.2 + p2[0] * 0.8) / 2
               cy = (p[1] * 1.2 + p2[1] * 0.8) / 2
             }
@@ -5857,15 +5826,15 @@ export default {
         }
 
         // swamp icons
-        if (height >= 21 && height < 22 && swampCount < +swampinessInput.value && land[i].used != 1) {
+        if (height >= 21 && height < 22 && swampCount < +swampinessInput.value && self.land[i].used != 1) {
           const g = swamps.append('g').attr('data-cell', cell)
           swampCount++
-          land[i].used = 1
+          self.land[i].used = 1
           let swamp = drawSwamp(p[0], p[1])
-          land[i].neighbors.forEach(function(e) {
-            if (cells[e].height >= 20 && cells[e].height < 30 && !cells[e].river && cells[e].used != 1) {
-              cells[e].used = 1
-              swamp += drawSwamp(cells[e].data[0], cells[e].data[1])
+          self.land[i].neighbors.forEach(function(e) {
+            if (self.cells[e].height >= 20 && self.cells[e].height < 30 && !self.cells[e].river && self.cells[e].used != 1) {
+              self.cells[e].used = 1
+              swamp += drawSwamp(self.cells[e].data[0], self.cells[e].data[1])
             }
           })
           g.append('path').attr('d', round(swamp, 1))
@@ -5874,17 +5843,17 @@ export default {
         // forest icons
         if (Math.random() < height / 100 && height >= 22 && height < 48) {
           for (let c = 0, a = area; Math.random() < a / 15; c++, a -= 15) {
-            if (land[i].ctype === 1 && c > 0) break
-            if (polygons[cell][c] === undefined) break
+            if (self.land[i].ctype === 1 && c > 0) break
+            if (self.polygons[cell][c] === undefined) break
             const g = forests.append('g').attr('data-cell', cell)
             if (c === 0) {
               cx = _.round(p[0] - 1 - Math.random(), 1)
               cy = p[1] - 2
             } else {
-              const p2 = polygons[cell][c]
+              const p2 = self.polygons[cell][c]
               if (c > 1) {
-                const dist = Math.hypot(p2[0] - polygons[cell][c - 1][0],
-                  p2[1] - polygons[cell][c - 1][1])
+                const dist = Math.hypot(p2[0] - self.polygons[cell][c - 1][0],
+                  p2[1] - self.polygons[cell][c - 1][1])
                 if (dist < 2) continue
               }
               cx = (p[0] * 0.5 + p2[0] * 1.5) / 2
@@ -5979,7 +5948,7 @@ export default {
 
     // Complete the map for the "customize" mode
     function getMap() {
-      if (customization !== 1) {
+      if (self.customization !== 1) {
         tip('Nothing to complete! Click on "Edit" or "Clear all" to enter a heightmap customization mode', null, 'error')
         return
       }
@@ -6000,7 +5969,7 @@ export default {
       if (!changeHeights.checked) restoreCustomHeights()
       drawCoastline()
       drawRelief()
-      const keepData = states.length && manors.length
+      const keepData = self.states.length && self.manors.length
       if (keepData) {
         restoreRegions()
       } else {
@@ -6015,8 +5984,8 @@ export default {
     $('#customizeTab').click(clickToAdd)
 
     function clickToAdd() {
-      if (modules.clickToAdd) return
-      modules.clickToAdd = true
+      if (self.modules.clickToAdd) return
+      self.modules.clickToAdd = true
 
       // add label on click
       $('#addLabel').click(function() {
@@ -6078,21 +6047,21 @@ export default {
         const x = _.round(point[0], 2), y = _.round(point[1], 2)
 
         // get culture in clicked point to generate a name
-        let culture = cells[index].culture
+        let culture = self.cells[index].culture
         if (culture === undefined) culture = 0
         const name = generateName(culture)
 
-        if (cells[index].height < 20) {
+        if (self.cells[index].height < 20) {
           tip('Cannot place burg in the water! Select a land cell', null, 'error')
           return
         }
-        if (cells[index].manor !== undefined) {
+        if (self.cells[index].manor !== undefined) {
           tip('There is already a burg in this cell. Please select a free cell', null, 'error')
           $('#grid').fadeIn()
           d3.select('#toggleGrid').classed('buttonoff', false)
           return
         }
-        const i = manors.length
+        const i = self.manors.length
         const size = burgIcons.select('#towns').attr('size')
         burgIcons.select('#towns').append('circle').attr('id', 'burg' + i).attr('data-id', i)
                  .attr('cx', x).attr('cy', y).attr('r', size).on('click', editBurg)
@@ -6107,24 +6076,24 @@ export default {
 
         let region, state = +$('#addBurg').attr('data-state')
         if (state !== -1) {
-          region = states[state].capital === 'neutral' ? 'neutral' : state
-          const oldRegion = cells[index].region
+          region = self.states[state].capital === 'neutral' ? 'neutral' : state
+          const oldRegion = self.cells[index].region
           if (region !== oldRegion) {
-            cells[index].region = region
+            self.cells[index].region = region
             redrawRegions()
           }
         } else {
-          region = cells[index].region
-          state = region === 'neutral' ? states.length - 1 : region
+          region = self.cells[index].region
+          state = region === 'neutral' ? self.states.length - 1 : region
         }
-        cells[index].manor = i
-        let score = cells[index].score
+        self.cells[index].manor = i
+        let score = self.cells[index].score
         if (score <= 0) {score = _.round(Math.random(), 2)}
-        if (cells[index].crossroad) {score += cells[index].crossroad} // crossroads
-        if (cells[index].confluence) {score += Math.pow(cells[index].confluence, 0.3)} // confluences
-        if (cells[index].port !== undefined) {score *= 3} // port-capital
+        if (self.cells[index].crossroad) {score += self.cells[index].crossroad} // crossroads
+        if (self.cells[index].confluence) {score += Math.pow(self.cells[index].confluence, 0.3)} // confluences
+        if (self.cells[index].port !== undefined) {score *= 3} // port-capital
         const population = _.round(score, 1)
-        manors.push({i, cell: index, x, y, region, culture, name, population})
+        self.manors.push({i, cell: index, x, y, region, culture, name, population})
         recalculateStateData(state)
         updateCountryEditors()
         tip('', true)
@@ -6147,8 +6116,8 @@ export default {
 
       function addRiverOnClick() {
         const point = d3.mouse(this)
-        const index = diagram.find(point[0], point[1]).index
-        let cell = cells[index]
+        const index = self.diagram.find(point[0], point[1]).index
+        let cell = self.cells[index]
         if (cell.river || cell.height < 20) return
         const dataRiver = [] // to store river points
         const last = $('#rivers > path').last()
@@ -6159,43 +6128,43 @@ export default {
           const x = cell.data[0], y = cell.data[1]
           dataRiver.push({x, y, cell: index})
           const nHeights = []
-          cell.neighbors.forEach(function(e) {nHeights.push(cells[e].height)})
+          cell.neighbors.forEach(function(e) {nHeights.push(self.cells[e].height)})
           const minId = nHeights.indexOf(d3.min(nHeights))
           const min = cell.neighbors[minId]
-          const tx = cells[min].data[0], ty = cells[min].data[1]
-          if (cells[min].height < 20) {
+          const tx = self.cells[min].data[0], ty = self.cells[min].data[1]
+          if (self.cells[min].height < 20) {
             const px = (x + tx) / 2
             const py = (y + ty) / 2
             dataRiver.push({x: px, y: py, cell: index})
             cell = undefined
           } else {
-            if (cells[min].river === undefined) {
-              cells[min].flux += cell.flux
-              cell = cells[min]
+            if (self.cells[min].river === undefined) {
+              self.cells[min].flux += cell.flux
+              cell = self.cells[min]
             } else {
-              const r = cells[min].river
+              const r = self.cells[min].river
               const riverEl = $('#river' + r)
-              const riverCells = $.grep(land, function(e) {return e.river === r})
+              const riverCells = $.grep(self.land, function(e) {return e.river === r})
               riverCells.sort(function(a, b) {return b.height - a.height})
               const riverCellsUpper = $.grep(riverCells,
-                function(e) {return e.height > cells[min].height})
+                function(e) {return e.height > self.cells[min].height})
               if (dataRiver.length > riverCellsUpper.length) {
                 // new river is more perspective
-                const avPrec = _.round(precInput.value / Math.sqrt(cells.length), 2)
+                const avPrec = _.round(precInput.value / Math.sqrt(self.cells.length), 2)
                 let dataRiverMin = []
                 riverCells.map(function(c) {
-                  if (c.height < cells[min].height) {
-                    cells[c.index].river = undefined
-                    cells[c.index].flux = avPrec
+                  if (c.height < self.cells[min].height) {
+                    self.cells[c.index].river = undefined
+                    self.cells[c.index].flux = avPrec
                   } else {
                     dataRiverMin.push({x: c.data[0], y: c.data[1], cell: c.index})
                   }
                 })
-                cells[min].flux += cell.flux
-                if (cells[min].confluence) {
-                  cells[min].confluence += riverCellsUpper.length
-                } else {cells[min].confluence = riverCellsUpper.length}
-                cell = cells[min]
+                self.cells[min].flux += cell.flux
+                if (self.cells[min].confluence) {
+                  self.cells[min].confluence += riverCellsUpper.length
+                } else {self.cells[min].confluence = riverCellsUpper.length}
+                cell = self.cells[min]
                 // redraw old river's upper part or remove if small
                 if (dataRiverMin.length > 1) {
                   var riverAmended = amendRiver(dataRiverMin, 1)
@@ -6203,13 +6172,13 @@ export default {
                   riverEl.attr('d', d).attr('data-width', 1.3).attr('data-increment', 1)
                 } else {
                   riverEl.remove()
-                  dataRiverMin.map(function(c) {cells[c.cell].river = undefined})
+                  dataRiverMin.map(function(c) {self.cells[c.cell].river = undefined})
                 }
               } else {
-                if (cells[min].confluence) {
-                  cells[min].confluence += dataRiver.length
-                } else {cells[min].confluence = dataRiver.length}
-                cells[min].flux += cell.flux
+                if (self.cells[min].confluence) {
+                  self.cells[min].confluence += dataRiver.length
+                } else {self.cells[min].confluence = dataRiver.length}
+                self.cells[min].flux += cell.flux
                 dataRiver.push({x: tx, y: ty, cell: min})
                 cell = undefined
               }
@@ -6240,7 +6209,7 @@ export default {
       function addReliefOnClick() {
         const point = d3.mouse(this)
         const index = getIndex(point)
-        const height = cells[index].height
+        const height = self.cells[index].height
         if (height < 20) {
           tip('Cannot place icon in the water! Select a land cell')
           return
@@ -6259,7 +6228,7 @@ export default {
 
       // add route on click
       $('#addRoute').click(function() {
-        if (!modules.editRoute) editRoute()
+        if (!self.modules.editRoute) editRoute()
         $('#routeNew').click()
       })
 
@@ -6302,7 +6271,7 @@ export default {
 
     // return cell / polly Index or error
     function getIndex(point) {
-      let c = diagram.find(point[0], point[1])
+      let c = self.diagram.find(point[0], point[1])
       if (!c) {
         console.error('Cannot find closest cell for points' + point[0] + ', ' + point[1])
         return
@@ -6312,14 +6281,14 @@ export default {
 
     // re-calculate data for a particular state
     function recalculateStateData(state) {
-      const s = states[state] || states[states.length - 1]
+      const s = self.states[state] || self.states[self.states.length - 1]
       if (s.capital === 'neutral') state = 'neutral'
-      const burgs = $.grep(manors, function(e) {return e.region === state})
+      const burgs = $.grep(self.manors, function(e) {return e.region === state})
       s.burgs = burgs.length
       let burgsPop = 0 // get summ of all burgs population
       burgs.map(function(b) {burgsPop += b.population})
       s.urbanPopulation = _.round(burgsPop, 1)
-      const regionCells = $.grep(cells, function(e) {return (e.region === state)})
+      const regionCells = $.grep(self.cells, function(e) {return (e.region === state)})
       let cellsPop = 0, area = 0
       regionCells.map(function(c) {
         cellsPop += c.pop
@@ -6332,27 +6301,27 @@ export default {
 
     function changeSelectedOnClick() {
       const point = d3.mouse(this)
-      const index = diagram.find(point[0], point[1]).index
-      if (cells[index].height < 20) return
+      const index = self.diagram.find(point[0], point[1]).index
+      if (self.cells[index].height < 20) return
       $('.selected').removeClass('selected')
       let color
 
       // select state
-      if (customization === 2) {
+      if (self.customization === 2) {
         const assigned = regions.select('#temp').select('path[data-cell=\'' + index + '\']')
-        let s = assigned.size() ? assigned.attr('data-state') : cells[index].region
-        if (s === 'neutral') s = states.length - 1
-        color = states[s].color
+        let s = assigned.size() ? assigned.attr('data-state') : self.cells[index].region
+        if (s === 'neutral') s = self.states.length - 1
+        color = self.states[s].color
         if (color === 'neutral') color = 'white'
         $('#state' + s).addClass('selected')
       }
 
       // select culture
-      if (customization === 4) {
+      if (self.customization === 4) {
         const assigned = cults.select('#cult' + index)
         const c = assigned.attr('data-culture') !== null
                   ? +assigned.attr('data-culture')
-                  : cells[index].culture
+                  : self.cells[index].culture
         color = self.cultures[c].color
         $('#culture' + c).addClass('selected')
       }
@@ -6456,8 +6425,8 @@ export default {
       const date = new Date()
       const dateString = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
       const license = 'File can be loaded in azgaar.github.io/Fantasy-Map-Generator'
-      const params = version + '|' + license + '|' + dateString + '|' + seed
-      const options = customization + '|' +
+      const params = version + '|' + license + '|' + dateString + '|' + self.seed
+      const options = self.customization + '|' +
                       distanceUnit.value + '|' + distanceScale.value + '|' + areaUnit.value + '|' +
                       barSize.value + '|' + barLabel.value + '|' + barBackOpacity.value + '|' + barBackColor.value + '|' +
                       populationRate.value + '|' + urbanization.value
@@ -6473,9 +6442,9 @@ export default {
 
       const svg_xml = (new XMLSerializer()).serializeToString(svg.node())
       const line = '\r\n'
-      let data = params + line + JSON.stringify(points) + line + JSON.stringify(cells) + line
-      data += JSON.stringify(manors) + line + JSON.stringify(states) + line + svg_xml + line + options + line
-      data += JSON.stringify(self.cultures) + line + '' + line + '' + line + heights + line + JSON.stringify(notes) + line
+      let data = params + line + JSON.stringify(self.points) + line + JSON.stringify(self.cells) + line
+      data += JSON.stringify(self.manors) + line + JSON.stringify(self.states) + line + svg_xml + line + options + line
+      data += JSON.stringify(self.cultures) + line + '' + line + '' + line + self.heights + line + JSON.stringify(self.notes) + line
       const dataBlob = new Blob([data], {type: 'text/plain'})
       const dataURL = window.URL.createObjectURL(dataBlob)
       const link = document.createElement('a')
@@ -6548,16 +6517,16 @@ export default {
       // update seed
       const params = data[0].split('|')
       if (params[3]) {
-        seed = params[3]
-        $('#optionsSeed').value = seed
+        self.seed = params[3]
+        $('#optionsSeed').value = self.seed
       }
 
       // get options
       if (data[0] === '0.52b' || data[0] === '0.53b') {
-        customization = 0
+        self.customization = 0
       } else if (data[6]) {
         const options = data[6].split('|')
-        customization = +options[0] || 0
+        self.customization = +options[0] || 0
         if (options[1]) distanceUnit.value = options[1]
         if (options[2]) distanceScale.value = options[2]
         if (options[3]) areaUnit.value = options[3]
@@ -6572,10 +6541,10 @@ export default {
       // replace old svg
       svg.remove()
       if (data[0] === '0.52b' || data[0] === '0.53b') {
-        states = [] // no states data in old maps
+        self.states = [] // no states data in old maps
         document.body.insertAdjacentHTML('afterbegin', data[4])
       } else {
-        states = JSON.parse(data[4])
+        self.states = JSON.parse(data[4])
         document.body.insertAdjacentHTML('afterbegin', data[5])
       }
 
@@ -6734,12 +6703,12 @@ export default {
 
       // update data
       const newPoints = []
-      riversData = []
-      queue = []
-      elSelected = ''
-      points = JSON.parse(data[1])
-      cells = JSON.parse(data[2])
-      manors = JSON.parse(data[3])
+      self.riversData = []
+      self.queue = []
+      self.elSelected = ''
+      self.points = JSON.parse(data[1])
+      self.cells = JSON.parse(data[2])
+      self.manors = JSON.parse(data[3])
 
       if (data[7])
         self.setCultures({cultures: JSON.parse(data[7])})
@@ -6748,12 +6717,12 @@ export default {
       self.verifyBases()
 
       if (data[11])
-        notes = JSON.parse(data[11])
+        self.notes = JSON.parse(data[11])
 
-      const graphSizeAdj = 90 / Math.sqrt(cells.length) // adjust to different graphSize
+      const graphSizeAdj = 90 / Math.sqrt(self.cells.length) // adjust to different graphSize
 
       // cells validations
-      cells.forEach(function(c, d) {
+      self.cells.forEach(function(c, d) {
         // collect points
         newPoints.push(c.data)
 
@@ -6769,10 +6738,10 @@ export default {
         }
 
         if (c.height >= 20) {
-          if (!polygons[d] || !polygons[d].length) return
+          if (!self.polygons[d] || !self.polygons[d].length) return
           // calculate area
           if (c.area === undefined || isNaN(c.area)) {
-            const area = d3.polygonArea(polygons[d])
+            const area = d3.polygonArea(self.polygons[d])
             c.area = _.round(Math.abs(area), 2)
           }
           // calculate population
@@ -6788,20 +6757,20 @@ export default {
         }
       })
 
-      land = $.grep(cells, function(e) {return (e.height >= 20)})
+      self.land = $.grep(self.cells, function(e) {return (e.height >= 20)})
       calculateVoronoi(newPoints)
 
       // get heights Uint8Array
-      if (data[10]) {heights = new Uint8Array(data[10].split(','))} else {
-        heights = new Uint8Array(points.length)
-        for (let i = 0; i < points.length; i++) {
-          const cell = diagram.find(points[i][0], points[i][1]).index
-          heights[i] = cells[cell].height
+      if (data[10]) {self.heights = new Uint8Array(data[10].split(','))} else {
+        self.heights = new Uint8Array(self.points.length)
+        for (let i = 0; i < self.points.length; i++) {
+          const cell = self.diagram.find(self.points[i][0], self.points[i][1]).index
+          self.heights[i] = self.cells[cell].height
         }
       }
 
       // restore Heightmap customization mode
-      if (customization === 1) {
+      if (self.customization === 1) {
         optionsTrigger.click()
         $('#customizeHeightmap, #customizationMenu').slideDown()
         $('#openEditor').slideUp()
@@ -6811,7 +6780,7 @@ export default {
         tip('The map is in Heightmap customization mode. Please finalize the Heightmap', true)
       }
       // restore Country Edition mode
-      if (customization === 2 || customization === 3) tip(
+      if (self.customization === 2 || self.customization === 3) tip(
         'The map is in Country Edition mode. Please complete the assignment', true)
 
       // restore layers state
@@ -6842,24 +6811,6 @@ export default {
       console.timeEnd('loadMap')
     }
 
-    // get square grid with some jirrering
-    function getJitteredGrid() {
-      let sizeMod = _.round((self.graphWidth + self.graphHeight) / 1500, 2) // screen size modifier
-      spacing = _.round(7.5 * sizeMod / graphSize, 2) // space between points before jirrering
-      const radius = spacing / 2 // square radius
-      const jittering = radius * 0.9 // max deviation
-      const jitter = function() {return Math.random() * 2 * jittering - jittering}
-      let points = []
-      for (let y = radius; y < self.graphHeight; y += spacing) {
-        for (let x = radius; x < self.graphWidth; x += spacing) {
-          let xj = _.round(x + jitter(), 2)
-          let yj = _.round(y + jitter(), 2)
-          points.push([xj, yj])
-        }
-      }
-      return points
-    }
-
     // Hotkeys, see github.com/Azgaar/Fantasy-Map-Generator/wiki/Hotkeys
     d3.select('body').on('keydown', function() {
       const active = document.activeElement.tagName
@@ -6874,11 +6825,11 @@ export default {
       else if (key === 83) saveAsImage('svg') // "S" to save as SVG
       else if (key === 77) saveMap() // "M" to save MAP file
       else if (key === 76) mapToLoad.click() // "L" to load MAP
-      else if (key === 32) console.table(cells[diagram.find(p[0], p[1]).index]) // Space to log focused cell data
-      else if (key === 192) console.log(cells) // "`" to log cells data
-      else if (key === 66) console.table(manors) // "B" to log burgs data
-      else if (key === 67) console.table(states) // "C" to log countries data
-      else if (key === 70) console.table(features) // "F" to log features data
+      else if (key === 32) console.table(self.cells[self.diagram.find(p[0], p[1]).index]) // Space to log focused cell data
+      else if (key === 192) console.log(self.cells) // "`" to log cells data
+      else if (key === 66) console.table(self.manors) // "B" to log burgs data
+      else if (key === 67) console.table(self.states) // "C" to log countries data
+      else if (key === 70) console.table(self.features) // "F" to log features data
       else if (key === 37) zoom.translateBy(svg, 10, 0) // Left to scroll map left
       else if (key === 39) zoom.translateBy(svg, -10, 0) // Right to scroll map right
       else if (key === 38) zoom.translateBy(svg, 0, 10) // Up to scroll map up
@@ -6946,26 +6897,26 @@ export default {
       if (id === 'editCultures') editCultures()
       if (id === 'editScale' || id === 'editScaleCountries' || id === 'editScaleBurgs') editScale()
       if (id === 'countriesManually') {
-        customization = 2
+        self.customization = 2
         tip('Click to select a country, drag the circle to re-assign', true)
         mockRegions()
         let temp = regions.append('g').attr('id', 'temp')
         $('#countriesBottom').children().hide()
         $('#countriesManuallyButtons').show()
         // highlight capital cells as it's not allowed to change capital's state that way
-        states.map(function(s) {
+        self.states.map(function(s) {
           if (s.capital === 'neutral' || s.capital === 'select') return
           const capital = s.capital
-          const index = manors[capital].cell
+          const index = self.manors[capital].cell
           temp.append('path')
               .attr('data-cell', index).attr('data-state', s.i)
-              .attr('d', 'M' + polygons[index].join('L') + 'Z')
+              .attr('d', 'M' + self.polygons[index].join('L') + 'Z')
               .attr('fill', s.color).attr('stroke', 'red').attr('stroke-width', .7)
         })
         viewbox.style('cursor', 'crosshair').call(drag).on('click', changeSelectedOnClick)
       }
       if (id === 'countriesRegenerate') {
-        customization = 3
+        self.customization = 3
         tip('Manually change "Expansion" value for a country or click on "Randomize" button',
           true)
         mockRegions()
@@ -6982,20 +6933,20 @@ export default {
         changedCells.each(function() {
           const el = d3.select(this)
           const cell = +el.attr('data-cell')
-          let stateOld = cells[cell].region
-          if (stateOld === 'neutral') {stateOld = states.length - 1}
+          let stateOld = self.cells[cell].region
+          if (stateOld === 'neutral') {stateOld = self.states.length - 1}
           const stateNew = +el.attr('data-state')
-          const region = states[stateNew].color === 'neutral' ? 'neutral' : stateNew
-          cells[cell].region = region
-          if (cells[cell].manor !== undefined) {manors[cells[cell].manor].region = region}
+          const region = self.states[stateNew].color === 'neutral' ? 'neutral' : stateNew
+          self.cells[cell].region = region
+          if (self.cells[cell].manor !== undefined) {self.manors[self.cells[cell].manor].region = region}
           changedStates.push(stateNew, stateOld)
         })
         changedStates = [...new Set(changedStates)]
         changedStates.map(function(s) {recalculateStateData(s)})
-        const last = states.length - 1
-        if (states[last].capital === 'neutral' && states[last].cells === 0) {
+        const last = self.states.length - 1
+        if (self.states[last].capital === 'neutral' && self.states[last].cells === 0) {
           $('#state' + last).remove()
-          states.splice(-1)
+          self.states.splice(-1)
         }
         $('#countriesManuallyCancel').click()
         if (changedStates.length) {editCountries()}
@@ -7010,7 +6961,7 @@ export default {
         $('.selected').removeClass('selected')
         $('div[data-sortby=\'expansion\'],.statePower, .icon-resize-full').addClass('hidden')
         $('div[data-sortby=\'cells\'],.stateCells, .icon-check-empty').removeClass('hidden')
-        customization = 0
+        self.customization = 0
         restoreDefaultEvents()
       }
       if (id === 'countriesApply') {$('#countriesManuallyCancel').click()}
@@ -7018,24 +6969,24 @@ export default {
         const mod = +powerInput.value * 2
         $('.statePower').each(function(e, i) {
           const state = +(this.parentNode.id).slice(5)
-          if (states[state].capital === 'neutral') return
+          if (self.states[state].capital === 'neutral') return
           const power = _.round(Math.random() * mod / 2 + 1, 1)
           $(this).val(power)
           $(this).parent().attr('data-expansion', power)
-          states[state].power = power
+          self.states[state].power = power
         })
         regenerateCountries()
       }
       if (id === 'countriesAddM' || id === 'countriesAddR' || id === 'countriesAddG') {
-        let i = states.length
+        let i = self.states.length
         // move neutrals to the last line
-        if (states[i - 1].capital === 'neutral') {
-          states[i - 1].i = i
+        if (self.states[i - 1].capital === 'neutral') {
+          self.states[i - 1].i = i
           i -= 1
         }
         var name = generateStateName(0)
         const color = colors20(i)
-        states.push({
+        self.states.push({
           i,
           color,
           name,
@@ -7047,12 +6998,12 @@ export default {
           area: 0,
           power: 1
         })
-        states.sort(function(a, b) {return a.i - b.i})
+        self.states.sort(function(a, b) {return a.i - b.i})
         editCountries()
       }
       if (id === 'countriesRegenerateNames') {
         const editor = d3.select('#countriesBody')
-        states.forEach(function(s) {
+        self.states.forEach(function(s) {
           if (s.capital === 'neutral') return
           s.name = generateStateName(s.i)
           labels.select('#regionLabel' + s.i).text(s.name)
@@ -7063,7 +7014,7 @@ export default {
         var el = $('#countriesEditor')
         if (el.attr('data-type') === 'absolute') {
           el.attr('data-type', 'percentage')
-          const totalCells = land.length
+          const totalCells = self.land.length
           const totalBurgs = +countriesFooterBurgs.innerHTML
           let totalArea = countriesFooterArea.innerHTML
           totalArea = getInteger(totalArea.split(' ')[0])
@@ -7101,10 +7052,10 @@ export default {
           data += population + '\n'
         })
         data += '\nBurg,Country,Culture,Population\n' // burgs headers
-        manors.map(function(m) {
+        self.manors.map(function(m) {
           if (m.region === 'removed') return // skip removed burgs
           data += m.name + ','
-          const country = m.region === 'neutral' ? 'neutral' : states[m.region].name
+          const country = m.region === 'neutral' ? 'neutral' : self.states[m.region].name
           data += country + ','
           data += self.cultures[m.culture].name + ','
           const population = m.population * urbanization.value * populationRate.value * 1000
@@ -7131,17 +7082,17 @@ export default {
             Remove: function() {
               $(this).dialog('close')
               $('#countriesBody').empty()
-              manors.map(function(m) {m.region = 'neutral'})
-              land.map(function(l) {l.region = 'neutral'})
-              states.map(function(s) {
+              self.manors.map(function(m) {m.region = 'neutral'})
+              self.land.map(function(l) {l.region = 'neutral'})
+              self.states.map(function(s) {
                 const c = +s.capital
                 if (isNaN(c)) return
                 moveBurgToGroup(c, 'towns')
               })
               removeAllLabelsInGroup('countries')
               regions.selectAll('path').remove()
-              states = []
-              states.push({i: 0, color: 'neutral', capital: 'neutral', name: 'Neutrals'})
+              self.states = []
+              self.states.push({i: 0, color: 'neutral', capital: 'neutral', name: 'Neutrals'})
               recalculateStateData(0)
               if ($('#burgsEditor').is(':visible')) {$('#burgsEditor').dialog('close')}
               editCountries()
@@ -7159,18 +7110,18 @@ export default {
             Remove: function() {
               $(this).dialog('close')
               const state = +$('#burgsEditor').attr('data-state')
-              const region = states[state].capital === 'neutral' ? 'neutral' : state
+              const region = self.states[state].capital === 'neutral' ? 'neutral' : state
               $('#burgsBody').empty()
-              manors.map(function(m) {
+              self.manors.map(function(m) {
                 if (m.region !== region) {return}
                 m.region = 'removed'
-                cells[m.cell].manor = undefined
+                self.cells[m.cell].manor = undefined
                 labels.select('[data-id=\'' + m.i + '\']').remove()
                 icons.selectAll('[data-id=\'' + m.i + '\']').remove()
               })
-              states[state].urbanPopulation = 0
-              states[state].burgs = 0
-              states[state].capital = 'select'
+              self.states[state].urbanPopulation = 0
+              self.states[state].burgs = 0
+              self.states[state].capital = 'select'
               if ($('#countriesEditor').is(':visible')) {
                 editCountries()
                 $('#burgsEditor').dialog('moveToTop')
@@ -7193,17 +7144,17 @@ export default {
         var s = +$('#burgsEditor').attr('data-state')
         $('.burgName').each(function(e, i) {
           const b = +(this.parentNode.id).slice(5)
-          const name = generateName(manors[b].culture)
+          const name = generateName(self.manors[b].culture)
           $(this).val(name)
           $(this).parent().attr('data-burg', name)
-          manors[b].name = name
+          self.manors[b].name = name
           labels.select('[data-id=\'' + b + '\']').text(name)
         })
         if ($('#countriesEditor').is(':visible')) {
-          if (states[s].capital === 'neutral') {return}
-          var c = states[s].capital
-          $('#state' + s).attr('data-capital', manors[c].name)
-          $('#state' + s + ' > .stateCapital').val(manors[c].name)
+          if (self.states[s].capital === 'neutral') {return}
+          var c = self.states[s].capital
+          $('#state' + s).attr('data-capital', self.manors[c].name)
+          $('#state' + s + ' > .stateCapital').val(self.manors[c].name)
         }
       }
       if (id === 'burgAdd') {
@@ -7276,7 +7227,7 @@ export default {
               closeDialogs()
               undraw()
               placePoints()
-              calculateVoronoi(points)
+              calculateVoronoi(self.points)
               detectNeighbors('grid')
               drawScaleBar()
               customizeHeightmap()
@@ -7311,7 +7262,7 @@ export default {
         return
       }
       // heightmap customization buttons
-      if (customization === 1) {
+      if (self.customization === 1) {
         if (id === 'paintBrushes') {openBrushesPanel()}
         if (id === 'rescaleExecute') {
           const subject = rescaleLower.value + '-' + rescaleHigher.value
@@ -7331,8 +7282,8 @@ export default {
         if (id === 'rescaleCondButton') {
           $('#modifyButtons').children().not('#rescaleCondButton, #rescaler').toggle()
         }
-        if (id === 'undo' || id === 'templateUndo') {restoreHistory(historyStage - 1)}
-        if (id === 'redo' || id === 'templateRedo') {restoreHistory(historyStage + 1)}
+        if (id === 'undo' || id === 'templateUndo') {restoreHistory(self.historyStage - 1)}
+        if (id === 'redo' || id === 'templateRedo') {restoreHistory(self.historyStage + 1)}
         if (id === 'smoothHeights') {
           smoothHeights(4)
           updateHeightmap()
@@ -7419,7 +7370,7 @@ export default {
         return
       }
       if (id === 'brushClear') {
-        if (customization === 1) {
+        if (self.customization === 1) {
           var message = 'Are you sure you want to clear the map?'
           alertMessage.innerHTML = message
           $('#alert').dialog({
@@ -7430,10 +7381,10 @@ export default {
                 viewbox.style('cursor', 'crosshair').call(drag)
                 landmassCounter.innerHTML = '0'
                 $('#landmass').empty()
-                heights = new Uint8Array(heights.length)
+                self.heights = new Uint8Array(self.heights.length)
                 // clear history
-                history = []
-                historyStage = 0
+                self.history = []
+                self.historyStage = 0
                 updateHistory()
                 redo.disabled = templateRedo.disabled = true
                 undo.disabled = templateUndo.disabled = true
@@ -7498,21 +7449,21 @@ export default {
       closeDialogs()
       const regionData = [], cultureData = []
       if (type !== 'clean') {
-        for (let i = 0; i < points.length; i++) {
-          let cell = diagram.find(points[i][0], points[i][1]).index
+        for (let i = 0; i < self.points.length; i++) {
+          let cell = self.diagram.find(self.points[i][0], self.points[i][1]).index
           // if closest cell is a small lake, try to find a land neighbor
-          if (cells[cell].lake === 2) cells[cell].neighbors.forEach(function(n) {
-            if (cells[n].height >= 20) {cell = n }
+          if (self.cells[cell].lake === 2) self.cells[cell].neighbors.forEach(function(n) {
+            if (self.cells[n].height >= 20) {cell = n }
           })
-          let region = cells[cell].region
+          let region = self.cells[cell].region
           if (region === undefined) region = -1
           regionData.push(region)
-          let culture = cells[cell].culture
+          let culture = self.cells[cell].culture
           if (culture === undefined) culture = -1
           cultureData.push(culture)
         }
       } else {undraw()}
-      calculateVoronoi(points)
+      calculateVoronoi(self.points)
       detectNeighbors('grid')
       drawScaleBar()
       if (type === 'keep') {
@@ -7520,9 +7471,9 @@ export default {
           '#lakes, #coastline, #terrain, #rivers, #grid, #terrs, #landmass, #ocean, #regions')
            .selectAll('path, circle, line').remove()
         svg.select('#shape').remove()
-        for (let i = 0; i < points.length; i++) {
-          if (regionData[i] !== -1) cells[i].region = regionData[i]
-          if (cultureData[i] !== -1) cells[i].culture = cultureData[i]
+        for (let i = 0; i < self.points.length; i++) {
+          if (regionData[i] !== -1) self.cells[i].region = regionData[i]
+          if (cultureData[i] !== -1) self.cells[i].culture = cultureData[i]
         }
       }
       mockHeightmap()
@@ -7541,8 +7492,8 @@ export default {
         $('#brushesButtons > .pressed').removeClass('pressed')
       })
 
-      if (modules.openBrushesPanel) return
-      modules.openBrushesPanel = true
+      if (self.modules.openBrushesPanel) return
+      self.modules.openBrushesPanel = true
 
       $('#brushesButtons > button').on('click', function() {
         const rSlider = $('#brushRadiusLabel, #brushRadius')
@@ -7584,7 +7535,7 @@ export default {
         while (j--) {
           const y = j / lineGranularity * height | 0
           let index = getCellIndex(x * wRatio, y * hRatio)
-          let h = heights[index] - 20
+          let h = self.heights[index] - 20
           if (h < 1) h = 0
           canvasPoints.push([x, y, h])
         }
@@ -7612,15 +7563,12 @@ export default {
 
     // get square grid cell index based on coords
     function getCellIndex(x, y) {
-      const index = diagram.find(x, y).index
-      // let cellsX = Math.round(self.graphWidth / spacing);
-      // let index = Math.ceil(y / spacing) * cellsX + Math.round(x / spacing);
-      return index
+      return self.diagram.find(x, y).index
     }
 
     function transformPt(pt) {
       const width = 320, maxHeight = 0.2
-      var [x, y] = projectIsometric(pt[0], pt[1])
+      let [x, y] = projectIsometric(pt[0], pt[1])
       return [x + width / 2 + 10, y + 10 - pt[2] * maxHeight]
     }
 
@@ -7631,10 +7579,10 @@ export default {
 
     // Execute custom template
     $('#templateRun').on('click', function() {
-      if (customization !== 1) return
+      if (self.customization !== 1) return
       let steps = $('#templateBody > div').length
       if (!steps) return
-      heights = new Uint8Array(heights.length) // clean all heights
+      self.heights = new Uint8Array(self.heights.length) // clean all heights
       for (let step = 1; step <= steps; step++) {
         const type = $('#templateBody div:nth-child(' + step + ')').attr('data-type')
         if (type === 'Mountain') {
@@ -7740,7 +7688,7 @@ export default {
       $('#landmass, #colorsUnassigned').fadeIn()
       $('#colorsAssigned').fadeOut()
       const colors = [], palette = []
-      points.map(function(i) {
+      self.points.map(function(i) {
         let x = Math.round(i[0]), y = Math.round(i[1])
         if (y == self.svgHeight) {y--}
         if (x == self.svgWidth) {x--}
@@ -7749,8 +7697,8 @@ export default {
         colors.push([r, g, b])
       })
       const cmap = quantize(colors, count)
-      heights = new Uint8Array(points.length)
-      polygons.map(function(i, d) {
+      self.heights = new Uint8Array(self.points.length)
+      self.polygons.map(function(i, d) {
         const nearest = cmap.nearest(colors[d])
         const rgb = 'rgb(' + nearest[0] + ', ' + nearest[1] + ', ' + nearest[2] + ')'
         const hex = toHEX(rgb)
@@ -7813,7 +7761,7 @@ export default {
       landmass.selectAll('.selectedCell').each(function() {
         d3.select(this).attr('fill', hex).attr('stroke', hex)
         let i = +d3.select(this).attr('data-i')
-        heights[i] = height
+        self.heights[i] = height
       })
       const parent = sel.parentNode
       if (parent.id === 'colorsUnassigned') {
@@ -7845,7 +7793,7 @@ export default {
       $('#landmass > path, .color-div').remove()
       $('#colorsAssigned').fadeIn()
       $('#colorsUnassigned').fadeOut()
-      polygons.forEach(function(i, d) {
+      self.polygons.forEach(function(i, d) {
         let x = Math.round(i.data[0]), y = Math.round(i.data[1])
         if (y == self.svgHeight) y--
         if (x == self.svgWidth) x--
@@ -7859,11 +7807,11 @@ export default {
         }
         const rgb = color(1 - normalized)
         const hex = toHEX(rgb)
-        heights[d] = normalized * 100
+        self.heights[d] = normalized * 100
         landmass.append('path').attr('d', 'M' + i.join('L') + 'Z').attr('data-i', d)
                 .attr('fill', hex).attr('stroke', hex)
       })
-      let unique = [...new Set(heights)].sort()
+      let unique = [...new Set(self.heights)].sort()
       unique.forEach(function(h) {
         const rgb = color(1 - h / 100)
         const hex = toHEX(rgb)
@@ -7897,12 +7845,12 @@ export default {
       viewbox.selectAll('path, circle, line, text, use, #ruler > g').remove()
       defs.selectAll('*').remove()
       landmass.select('rect').remove()
-      cells = [], land = [], riversData = [], manors = [], states = [], features = [], queue = []
+      self.cells = [], self.land = [], self.riversData = [], self.manors = [], self.states = [], self.features = [], self.queue = []
     }
 
     // Enter Heightmap Customization mode
     function customizeHeightmap() {
-      customization = 1
+      self.customization = 1
       tip('Heightmap customization mode is active. Click on "Complete" to finalize the Heightmap',
         true)
       $('#getMap').removeClass('buttonoff').addClass('glow')
@@ -7917,7 +7865,7 @@ export default {
 
     // Remove all customization related styles, reset values
     function exitCustomization() {
-      customization = 0
+      self.customization = 0
       tip('', true)
       canvas.style.opacity = 0
       $('#customizationMenu').slideUp()
@@ -7928,8 +7876,8 @@ export default {
       restoreDefaultEvents()
       if (!$('#toggleHeight').hasClass('buttonoff')) {toggleHeight()}
       closeDialogs()
-      history = []
-      historyStage = 0
+      self.history = []
+      self.historyStage = 0
       $('#customizeHeightmap').slideUp()
       $('#openEditor').slideDown()
       debug.selectAll('.circle, .tag, .line').remove()
@@ -7948,29 +7896,29 @@ export default {
         unit = ' ' + areaUnit.value
       }
       let totalPopulation = 0
-      for (let s = 0; s < states.length; s++) {
+      for (let s = 0; s < self.states.length; s++) {
         $('#countriesBody').append('<div class="states" id="state' + s + '"></div>')
         const el = $('#countriesBody div:last-child')
-        const burgsCount = states[s].burgs
+        const burgsCount = self.states[s].burgs
         totalBurgs += burgsCount
         // calculate user-friendly area and population
-        const area = Math.round(states[s].area * Math.pow(distanceScale.value, 2))
+        const area = Math.round(self.states[s].area * Math.pow(distanceScale.value, 2))
         totalArea += area
         areaConv = si(area) + unit
-        const urban = Math.round(states[s].urbanPopulation * urbanization.value * populationRate.value)
-        const rural = _.round(states[s].ruralPopulation * populationRate.value)
+        const urban = Math.round(self.states[s].urbanPopulation * urbanization.value * populationRate.value)
+        const rural = _.round(self.states[s].ruralPopulation * populationRate.value)
         var population = (urban + rural) * 1000
         totalPopulation += population
         const populationConv = si(population)
         const title = '\'Total population: ' + populationConv + '; Rural population: ' + rural + 'K; Urban population: ' + urban + 'K\''
-        let neutral = states[s].color === 'neutral' || states[s].capital === 'neutral'
+        let neutral = self.states[s].color === 'neutral' || self.states[s].capital === 'neutral'
         // append elements to countriesBody
         if (!neutral) {
           el.append(
-            '<input onmouseover="tip(\'Country color. Click to change\')" class="stateColor" type="color" value="' + states[s].color + '"/>')
+            '<input onmouseover="tip(\'Country color. Click to change\')" class="stateColor" type="color" value="' + self.states[s].color + '"/>')
           el.append(
-            '<input onmouseover="tip(\'Country name. Click and type to change\')" class="stateName" value="' + states[s].name + '" autocorrect="off" spellcheck="false"/>')
-          var capital = states[s].capital !== 'select' ? manors[states[s].capital].name : 'select'
+            '<input onmouseover="tip(\'Country name. Click and type to change\')" class="stateName" value="' + self.states[s].name + '" autocorrect="off" spellcheck="false"/>')
+          var capital = self.states[s].capital !== 'select' ? self.manors[self.states[s].capital].name : 'select'
           if (capital === 'select') {
             el.append(
               '<button onmouseover="tip(\'Click on map to select a capital or to create a new capital\')" class="selectCapital" id="selectCapital' + s + '">★ select</button>')
@@ -7983,11 +7931,11 @@ export default {
           el.append(
             '<span onmouseover="tip(\'Country expansionism (defines competitive size)\')" class="icon-resize-full hidden"></span>')
           el.append(
-            '<input onmouseover="tip(\'Capital expansionism (defines competitive size)\')" class="statePower hidden" type="number" min="0" max="99" step="0.1" value="' + states[s].power + '"/>')
+            '<input onmouseover="tip(\'Capital expansionism (defines competitive size)\')" class="statePower hidden" type="number" min="0" max="99" step="0.1" value="' + self.states[s].power + '"/>')
         } else {
           el.append('<input class="stateColor placeholder" disabled type="color"/>')
           el.append(
-            '<input onmouseover="tip(\'Neutral burgs are united into this group. Click to change the group name\')" class="stateName italic" id="stateName' + s + '" value="' + states[s].name + '" autocorrect="off" spellcheck="false"/>')
+            '<input onmouseover="tip(\'Neutral burgs are united into this group. Click to change the group name\')" class="stateName italic" id="stateName' + s + '" value="' + self.states[s].name + '" autocorrect="off" spellcheck="false"/>')
           el.append('<span class="icon-star-empty placeholder"></span>')
           el.append('<input class="stateCapital placeholder"/>')
           el.append('<span class="icon-resize-full hidden placeholder"></span>')
@@ -7995,7 +7943,7 @@ export default {
         }
         el.append('<span onmouseover="tip(\'Cells count\')" class="icon-check-empty"></span>')
         el.append(
-          '<div onmouseover="tip(\'Cells count\')" class="stateCells">' + states[s].cells + '</div>')
+          '<div onmouseover="tip(\'Cells count\')" class="stateCells">' + self.states[s].cells + '</div>')
         el.append(
           '<span onmouseover="tip(\'Burgs count. Click to see a full list\')" style="padding-right: 1px" class="stateBIcon icon-dot-circled"></span>')
         el.append(
@@ -8010,14 +7958,14 @@ export default {
         if (!neutral) {
           el.append(
             '<span onmouseover="tip(\'Remove country, all assigned cells will become Neutral\')" class="icon-trash-empty"></span>')
-          el.attr('data-country', states[s].name).attr('data-capital', capital)
-            .attr('data-expansion', states[s].power).attr('data-cells', states[s].cells)
-            .attr('data-burgs', states[s].burgs).attr('data-area', area)
+          el.attr('data-country', self.states[s].name).attr('data-capital', capital)
+            .attr('data-expansion', self.states[s].power).attr('data-cells', self.states[s].cells)
+            .attr('data-burgs', self.states[s].burgs).attr('data-area', area)
             .attr('data-population', population)
         } else {
           el.attr('data-country', 'bottom').attr('data-capital', 'bottom')
-            .attr('data-expansion', 'bottom').attr('data-cells', states[s].cells)
-            .attr('data-burgs', states[s].burgs).attr('data-area', area)
+            .attr('data-expansion', 'bottom').attr('data-cells', self.states[s].cells)
+            .attr('data-burgs', self.states[s].burgs).attr('data-area', area)
             .attr('data-population', population)
         }
       }
@@ -8028,13 +7976,13 @@ export default {
           minHeight: 'auto', minWidth: Math.min(self.svgWidth, 390),
           position: {my: 'right top', at: 'right-10 top+10', of: 'svg'}
         }).on('dialogclose', function() {
-          if (customization === 2 || customization === 3) {
+          if (self.customization === 2 || self.customization === 3) {
             $('#countriesManuallyCancel').click()
           }
         })
       }
       // restore customization Editor version
-      if (customization === 3) {
+      if (self.customization === 3) {
         $('div[data-sortby=\'expansion\'],.statePower, .icon-resize-full').removeClass('hidden')
         $('div[data-sortby=\'cells\'],.stateCells, .icon-check-empty').addClass('hidden')
       } else {
@@ -8042,9 +7990,9 @@ export default {
         $('div[data-sortby=\'cells\'],.stateCells, .icon-check-empty').removeClass('hidden')
       }
       // populate total line on footer
-      countriesFooterCountries.innerHTML = states.length
-      if (states[states.length - 1].capital === 'neutral') {
-        countriesFooterCountries.innerHTML = states.length - 1
+      countriesFooterCountries.innerHTML = self.states.length
+      if (self.states[self.states.length - 1].capital === 'neutral') {
+        countriesFooterCountries.innerHTML = self.states.length - 1
       }
       countriesFooterBurgs.innerHTML = totalBurgs
       countriesFooterArea.innerHTML = si(totalArea) + unit
@@ -8053,18 +8001,18 @@ export default {
       $('#countriesBody .states').hover(focusOnState, unfocusState)
       $('.enlange').click(function() {
         const s = +(this.parentNode.id).slice(5)
-        const capital = states[s].capital
+        const capital = self.states[s].capital
         const l = labels.select('[data-id=\'' + capital + '\']')
         const x = +l.attr('x'), y = +l.attr('y')
         zoomTo(x, y, 8, 1600)
       })
       $('.stateName').on('input', function() {
         const s = +(this.parentNode.id).slice(5)
-        states[s].name = this.value
+        self.states[s].name = this.value
         labels.select('#regionLabel' + s).text(this.value)
         if ($('#burgsEditor').is(':visible')) {
           if ($('#burgsEditor').attr('data-state') == s) {
-            const color = '<input title="Country color. Click to change" type="color" class="stateColor" value="' + states[s].color + '"/>'
+            const color = '<input title="Country color. Click to change" type="color" class="stateColor" value="' + self.states[s].color + '"/>'
             $('div[aria-describedby=\'burgsEditor\'] .ui-dialog-title').text('Burgs of ' + this.value)
                                                                        .prepend(color)
           }
@@ -8072,7 +8020,7 @@ export default {
       })
       $('.states > .stateColor').on('change', function() {
         const s = +(this.parentNode.id).slice(5)
-        states[s].color = this.value
+        self.states[s].color = this.value
         regions.selectAll('.region' + s).attr('fill', this.value).attr('stroke', this.value)
         if ($('#burgsEditor').is(':visible')) {
           if ($('#burgsEditor').attr('data-state') == s) {
@@ -8082,8 +8030,8 @@ export default {
       })
       $('.stateCapital').on('input', function() {
         const s = +(this.parentNode.id).slice(5)
-        const capital = states[s].capital
-        manors[capital].name = this.value
+        const capital = self.states[s].capital
+        self.manors[capital].name = this.value
         labels.select('[data-id=\'' + capital + '\']').text(this.value)
         if ($('#burgsEditor').is(':visible')) {
           if ($('#burgsEditor').attr('data-state') == s) {
@@ -8094,11 +8042,11 @@ export default {
       $('.stateBurgs, .stateBIcon').on('click', editBurgs).hover(focusBurgs, unfocus)
 
       $('#countriesBody > .states').on('click', function() {
-        if (customization === 2) {
+        if (self.customization === 2) {
           $('.selected').removeClass('selected')
           $(this).addClass('selected')
           const state = +$(this).attr('id').slice(5)
-          let color = states[state].color
+          let color = self.states[state].color
           if (color === 'neutral') {color = 'white'}
           if (debug.selectAll('.circle').size()) debug.selectAll('.circle').attr('stroke', color)
         }
@@ -8121,26 +8069,26 @@ export default {
         const index = getIndex(point)
         const x = _.round(point[0], 2), y = _.round(point[1], 2)
 
-        if (cells[index].height < 20) {
+        if (self.cells[index].height < 20) {
           tip('Cannot place capital on the water! Select a land cell')
           return
         }
         const state = +$('.selectCapital.pressed').attr('id').replace('selectCapital', '')
-        let oldState = cells[index].region
-        if (oldState === 'neutral') {oldState = states.length - 1}
-        if (cells[index].manor !== undefined) {
+        let oldState = self.cells[index].region
+        if (oldState === 'neutral') {oldState = self.states.length - 1}
+        if (self.cells[index].manor !== undefined) {
           // cell has burg
-          const burg = cells[index].manor
-          if (states[oldState].capital === burg) {
+          const burg = self.cells[index].manor
+          if (self.states[oldState].capital === burg) {
             tip('Existing capital cannot be selected as a new state capital! Select other cell')
             return
           } else {
             // make this burg a new capital
             const urbanFactor = 0.9 // for old neutrals
-            manors[burg].region = state
-            if (oldState === 'neutral') {manors[burg].population *= (1 / urbanFactor)}
-            manors[burg].population *= 2 // give capital x2 population bonus
-            states[state].capital = burg
+            self.manors[burg].region = state
+            if (oldState === 'neutral') {self.manors[burg].population *= (1 / urbanFactor)}
+            self.manors[burg].population *= 2 // give capital x2 population bonus
+            self.states[state].capital = burg
             moveBurgToGroup(burg, 'capitals')
           }
         } else {
@@ -8148,26 +8096,26 @@ export default {
           const closest = self.cultureTree.find(x, y)
           const culture = self.cultureTree.data().indexOf(closest) || 0
           const name = generateName(culture)
-          const i = manors.length
-          cells[index].manor = i
-          states[state].capital = i
-          let score = cells[index].score
+          const i = self.manors.length
+          self.cells[index].manor = i
+          self.states[state].capital = i
+          let score = self.cells[index].score
           if (score <= 0) {score = _.round(Math.random(), 2)}
-          if (cells[index].crossroad) {score += cells[index].crossroad} // crossroads
-          if (cells[index].confluence) {score += Math.pow(cells[index].confluence, 0.3)} // confluences
-          if (cells[index].port !== undefined) {score *= 3} // port-capital
+          if (self.cells[index].crossroad) {score += self.cells[index].crossroad} // crossroads
+          if (self.cells[index].confluence) {score += Math.pow(self.cells[index].confluence, 0.3)} // confluences
+          if (self.cells[index].port !== undefined) {score *= 3} // port-capital
           const population = _.round(score, 1)
-          manors.push({i, cell: index, x, y, region: state, culture, name, population})
+          self.manors.push({i, cell: index, x, y, region: state, culture, name, population})
           burgIcons.select('#capitals').append('circle').attr('id', 'burg' + i).attr('data-id', i)
                    .attr('cx', x).attr('cy', y).attr('r', 1).on('click', editBurg)
           burgLabels.select('#capitals').append('text').attr('data-id', i).attr('x', x).attr('y', y)
                     .attr('dy', '-0.35em').text(name).on('click', editBurg)
         }
-        cells[index].region = state
-        cells[index].neighbors.map(function(n) {
-          if (cells[n].height < 20) {return}
-          if (cells[n].manor !== undefined) {return}
-          cells[n].region = state
+        self.cells[index].region = state
+        self.cells[index].neighbors.map(function(n) {
+          if (self.cells[n].height < 20) {return}
+          if (self.cells[n].manor !== undefined) {return}
+          self.cells[n].region = state
         })
         redrawRegions()
         recalculateStateData(oldState) // re-calc old state data
@@ -8178,7 +8126,7 @@ export default {
 
       $('.statePower').on('input', function() {
         const s = +(this.parentNode.id).slice(5)
-        states[s].power = +this.value
+        self.states[s].power = +this.value
         regenerateCountries()
       })
       $('.statePopulation').on('change', function() {
@@ -8190,10 +8138,10 @@ export default {
           return
         }
         const change = popNew / popOr
-        states[s].urbanPopulation = _.round(states[s].urbanPopulation * change, 2)
-        states[s].ruralPopulation = _.round(states[s].ruralPopulation * change, 2)
-        const urban = Math.round(states[s].urbanPopulation * urbanization.value * populationRate.value)
-        const rural = Math.round(states[s].ruralPopulation * populationRate.value)
+        self.states[s].urbanPopulation = _.round(self.states[s].urbanPopulation * change, 2)
+        self.states[s].ruralPopulation = _.round(self.states[s].ruralPopulation * change, 2)
+        const urban = Math.round(self.states[s].urbanPopulation * urbanization.value * populationRate.value)
+        const rural = Math.round(self.states[s].ruralPopulation * populationRate.value)
         const population = (urban + rural) * 1000
         $(this).parent().attr('data-population', population)
         this.value = si(population)
@@ -8202,8 +8150,8 @@ export default {
           total += +$(this).attr('data-population')
         })
         countriesFooterPopulation.innerHTML = si(total)
-        if (states[s].capital === 'neutral') {s = 'neutral'}
-        manors.map(function(m) {
+        if (self.states[s].capital === 'neutral') {s = 'neutral'}
+        self.manors.map(function(m) {
           if (m.region !== s) {return}
           m.population = _.round(m.population * change, 2)
         })
@@ -8225,22 +8173,22 @@ export default {
       })
 
       function removeCountry(s) {
-        const cellsCount = states[s].cells
-        const capital = +states[s].capital
+        const cellsCount = self.states[s].cells
+        const capital = +self.states[s].capital
         if (!isNaN(capital)) moveBurgToGroup(capital, 'towns')
-        states.splice(s, 1)
-        states.map(function(s, i) {s.i = i})
-        land.map(function(c) {
+        self.states.splice(s, 1)
+        self.states.map(function(s, i) {s.i = i})
+        self.land.map(function(c) {
           if (c.region === s) c.region = 'neutral'
           else if (c.region > s) c.region -= 1
         })
         // do only if removed state had cells
         if (cellsCount) {
-          manors.map(function(b) {if (b.region === s) b.region = 'neutral'})
+          self.manors.map(function(b) {if (b.region === s) b.region = 'neutral'})
           // re-calculate neutral data
-          const i = states.length
-          if (states[i - 1].capital !== 'neutral') {
-            states.push({i, color: 'neutral', name: 'Neutrals', capital: 'neutral'})
+          const i = self.states.length
+          if (self.states[i - 1].capital !== 'neutral') {
+            self.states.push({i, color: 'neutral', name: 'Neutrals', capital: 'neutral'})
           }
           recalculateStateData(i - 1) // re-calc data for neutrals
           redrawRegions()
@@ -8258,8 +8206,8 @@ export default {
       $('#burgsBody').empty()
       $('#burgsHeader').children().removeClass(
         'icon-sort-name-up icon-sort-name-down icon-sort-number-up icon-sort-number-down')
-      const region = states[s].capital === 'neutral' ? 'neutral' : s
-      const burgs = $.grep(manors, function(e) {
+      const region = self.states[s].capital === 'neutral' ? 'neutral' : s
+      const burgs = $.grep(self.manors, function(e) {
         return (e.region === region)
       })
       const populationArray = []
@@ -8275,7 +8223,7 @@ export default {
         population = population > 1e4 ? si(population) : _.round(population, -1)
         el.append('<span title="Population" class="icon-male"></span>')
         el.append('<input title="Population. Input to change" class="burgPopulation" value="' + population + '"/>')
-        const capital = states[s].capital
+        const capital = self.states[s].capital
         let type = 'z-burg' // usual burg by default
         if (b.i === capital) {
           el.append('<span title="Capital" class="icon-star-empty"></span>')
@@ -8283,7 +8231,7 @@ export default {
         } else {
           el.append('<span class="icon-star-empty placeholder"></span>')
         }
-        if (cells[b.cell].port !== undefined) {
+        if (self.cells[b.cell].port !== undefined) {
           el.append('<span title="Port" class="icon-anchor small"></span>')
           type = type === 'c-capital' ? 'a-capital-port' : 'p-port'
         } else {
@@ -8297,11 +8245,11 @@ export default {
       })
       if (!$('#burgsEditor').is(':visible')) {
         $('#burgsEditor').dialog({
-          title: 'Burgs of ' + states[s].name,
+          title: 'Burgs of ' + self.states[s].name,
           minHeight: 'auto', width: 'auto',
           position: {my: 'right bottom', at: 'right-10 bottom-10', of: 'svg'}
         })
-        const color = '<input title="Country color. Click to change" type="color" class="stateColor" value="' + states[s].color + '"/>'
+        const color = '<input title="Country color. Click to change" type="color" class="stateColor" value="' + self.states[s].color + '"/>'
         if (region !== 'neutral') {
           $('div[aria-describedby=\'burgsEditor\'] .ui-dialog-title').prepend(color)
         }
@@ -8323,13 +8271,13 @@ export default {
         if (!$('#changeCapital').hasClass('pressed')) return
         const s = +$('#burgsEditor').attr('data-state')
         const newCap = +$(this).attr('id').slice(5)
-        const oldCap = +states[s].capital
+        const oldCap = +self.states[s].capital
         if (newCap === oldCap) {
           tip('This burg is already a capital! Please select a different burg', null, 'error')
           return
         }
         $('#changeCapital').removeClass('pressed')
-        states[s].capital = newCap
+        self.states[s].capital = newCap
         if (!isNaN(oldCap)) moveBurgToGroup(oldCap, 'towns')
         recalculateStateData(s)
         moveBurgToGroup(newCap, 'capitals')
@@ -8337,14 +8285,14 @@ export default {
 
       $('.burgName').on('input', function() {
         const b = +(this.parentNode.id).slice(5)
-        manors[b].name = this.value
+        self.manors[b].name = this.value
         labels.select('[data-id=\'' + b + '\']').text(this.value)
         if (b === s && $('#countriesEditor').is(':visible')) {
           $('#state' + s + ' > .stateCapital').val(this.value)
         }
       })
       $('.ui-dialog-title > .stateColor').on('change', function() {
-        states[s].color = this.value
+        self.states[s].color = this.value
         regions.selectAll('.region' + s).attr('fill', this.value).attr('stroke', this.value)
         if ($('#countriesEditor').is(':visible')) {
           $('#state' + s + ' > .stateColor').val(this.value)
@@ -8354,27 +8302,27 @@ export default {
         const b = +(this.parentNode.id).slice(5)
         const pop = getInteger(this.value)
         if (!Number.isInteger(pop) || pop < 10) {
-          const orig = _.round(manors[b].population * urbanization.value * populationRate.value * 1000,
+          const orig = _.round(self.manors[b].population * urbanization.value * populationRate.value * 1000,
             2)
           this.value = si(orig)
           return
         }
         const populationRaw = _.round(pop / urbanization.value / populationRate.value / 1000, 2)
-        const change = populationRaw - manors[b].population
-        manors[b].population = populationRaw
+        const change = populationRaw - self.manors[b].population
+        self.manors[b].population = populationRaw
         $(this).parent().attr('data-population', populationRaw)
         this.value = si(pop)
-        let state = manors[b].region
-        if (state === 'neutral') {state = states.length - 1}
-        states[state].urbanPopulation += change
+        let state = self.manors[b].region
+        if (state === 'neutral') {state = self.states.length - 1}
+        self.states[state].urbanPopulation += change
         updateCountryPopulationUI(state)
-        const average = states[state].urbanPopulation / states[state].burgs * urbanization.value * populationRate.value * 1000
+        const average = self.states[state].urbanPopulation / self.states[state].burgs * urbanization.value * populationRate.value * 1000
         burgsFooterPopulation.value = _.round(average, -1)
       })
       $('#burgsFooterPopulation').on('change', function() {
         const state = +$('#burgsEditor').attr('data-state')
         const newPop = +this.value
-        const avPop = states[state].urbanPopulation / states[state].burgs * urbanization.value * populationRate.value * 1000
+        const avPop = self.states[state].urbanPopulation / self.states[state].burgs * urbanization.value * populationRate.value * 1000
         if (!Number.isInteger(newPop) || newPop < 10) {
           this.value = _.round(avPop, -1)
           return
@@ -8382,14 +8330,14 @@ export default {
         const change = +this.value / avPop
         $('#burgsBody > div').each(function(e, i) {
           const b = +(this.id).slice(5)
-          const pop = _.round(manors[b].population * change, 2)
-          manors[b].population = pop
+          const pop = _.round(self.manors[b].population * change, 2)
+          self.manors[b].population = pop
           $(this).attr('data-population', pop)
           let popUI = pop * urbanization.value * populationRate.value * 1000
           popUI = popUI > 1e4 ? si(popUI) : _.round(popUI, -1)
           $(this).children().filter('.burgPopulation').val(popUI)
         })
-        states[state].urbanPopulation = _.round(states[state].urbanPopulation * change, 2)
+        self.states[state].urbanPopulation = _.round(self.states[state].urbanPopulation * change, 2)
         updateCountryPopulationUI(state)
       })
       $('#burgsBody .icon-trash-empty').on('click', function() {
@@ -8402,17 +8350,17 @@ export default {
               $(this).dialog('close')
               const state = +$('#burgsEditor').attr('data-state')
               $('#burgs' + b).remove()
-              const cell = manors[b].cell
-              manors[b].region = 'removed'
-              cells[cell].manor = undefined
-              states[state].burgs = states[state].burgs - 1
-              burgsFooterBurgs.innerHTML = states[state].burgs
+              const cell = self.manors[b].cell
+              self.manors[b].region = 'removed'
+              self.cells[cell].manor = undefined
+              self.states[state].burgs = self.states[state].burgs - 1
+              burgsFooterBurgs.innerHTML = self.states[state].burgs
               countriesFooterBurgs.innerHTML = +countriesFooterBurgs.innerHTML - 1
-              states[state].urbanPopulation = states[state].urbanPopulation - manors[b].population
-              const avPop = states[state].urbanPopulation / states[state].burgs * urbanization.value * populationRate.value * 1000
+              self.states[state].urbanPopulation = self.states[state].urbanPopulation - self.manors[b].population
+              const avPop = self.states[state].urbanPopulation / self.states[state].burgs * urbanization.value * populationRate.value * 1000
               burgsFooterPopulation.value = _.round(avPop, -1)
               if ($('#countriesEditor').is(':visible')) {
-                $('#state' + state + ' > .stateBurgs').text(states[state].burgs)
+                $('#state' + state + ' > .stateBurgs').text(self.states[state].burgs)
               }
               labels.select('[data-id=\'' + b + '\']').remove()
               icons.select('[data-id=\'' + b + '\']').remove()
@@ -8440,14 +8388,14 @@ export default {
 
     function focusCapital() {
       const s = +(this.parentNode.id).slice(5)
-      const capital = states[s].capital
+      const capital = self.states[s].capital
       labels.select('[data-id=\'' + capital + '\']').classed('drag', true)
       icons.select('[data-id=\'' + capital + '\']').classed('drag', true)
     }
 
     function focusBurgs() {
       const s = +(this.parentNode.id).slice(5)
-      const stateManors = $.grep(manors, function(e) {
+      const stateManors = $.grep(self.manors, function(e) {
         return (e.region === s)
       })
       stateManors.map(function(m) {
@@ -8491,7 +8439,7 @@ export default {
       const cellsC = [], areas = [], rurPops = [], urbPops = []
       const unit = areaUnit.value === 'square' ? ' ' + distanceUnit.value + '²'
                                                : ' ' + areaUnit.value
-      land.map(function(l) {
+      self.land.map(function(l) {
         const c = l.culture
         if (c === undefined) return
         cellsC[c] = cellsC[c] ? cellsC[c] + 1 : 1
@@ -8499,7 +8447,7 @@ export default {
         rurPops[c] = rurPops[c] ? rurPops[c] + l.pop : l.pop
       })
 
-      manors.map(function(m) {
+      self.manors.map(function(m) {
         const c = m.culture
         if (isNaN(c)) return
         urbPops[c] = urbPops[c] ? urbPops[c] + m.population : m.population
@@ -8548,7 +8496,7 @@ export default {
 
       let activeCultures = cellsC.reduce(function(s, v) {if (v) {return s + 1} else {return s}}, 0)
       culturesFooterCultures.innerHTML = activeCultures + '/' + self.cultures.length
-      culturesFooterCells.innerHTML = land.length
+      culturesFooterCells.innerHTML = self.land.length
       let totalArea = areas.reduce(function(s, v) {return s + v})
       totalArea = Math.round(totalArea * Math.pow(distanceScale.value, 2))
       culturesFooterArea.innerHTML = si(totalArea) + unit
@@ -8578,7 +8526,7 @@ export default {
       })
 
       $('.cultures').on('click', function() {
-        if (customization !== 4) return
+        if (self.customization !== 4) return
         const c = +(this.id).slice(7)
         $('.selected').removeClass('selected')
         $(this).addClass('selected')
@@ -8601,7 +8549,7 @@ export default {
 
       $('.cultures .icon-arrows-cw').on('click', function() {
         const c = +(this.parentNode.id).slice(7)
-        manors.forEach(function(m) {
+        self.manors.forEach(function(m) {
           if (m.region === 'removed') return
           if (m.culture !== c) return
           m.name = generateName(c)
@@ -8616,8 +8564,8 @@ export default {
         editCultures()
       })
 
-      if (modules.editCultures) return
-      modules.editCultures = true
+      if (self.modules.editCultures) return
+      self.modules.editCultures = true
 
       function addCultureBaseOptions() {
         $('.cultureBase').each(function() {
@@ -8669,7 +8617,7 @@ export default {
         const el = $('#culturesEditor')
         if (el.attr('data-type') === 'absolute') {
           el.attr('data-type', 'percentage')
-          const totalCells = land.length
+          const totalCells = self.land.length
           let totalArea = culturesFooterArea.innerHTML
           totalArea = getInteger(totalArea.split(' ')[0])
           const totalPopulation = getInteger(culturesFooterPopulation.innerHTML)
@@ -8688,7 +8636,7 @@ export default {
       })
 
       $('#culturesManually').on('click', function() {
-        customization = 4
+        self.customization = 4
         tip('Click to select a culture, drag the circle to re-assign', true)
         $('#culturesBottom').children().hide()
         $('#culturesManuallyButtons').show()
@@ -8702,9 +8650,9 @@ export default {
           const i = +(this.id).slice(4)
           const c = +this.getAttribute('data-culture')
           this.removeAttribute('data-culture')
-          cells[i].culture = c
-          const manor = cells[i].manor
-          if (manor !== undefined) manors[manor].culture = c
+          self.cells[i].culture = c
+          const manor = self.cells[i].manor
+          if (manor !== undefined) self.manors[manor].culture = c
         })
         exitCulturesManualAssignment()
         if (changed.size()) editCultures()
@@ -8713,7 +8661,7 @@ export default {
       $('#culturesManuallyCancel').on('click', function() {
         cults.selectAll('[data-culture]').each(function() {
           const i = +(this.id).slice(4)
-          const c = cells[i].culture
+          const c = self.cells[i].culture
           this.removeAttribute('data-culture')
           const color = self.cultures[c].color
           this.setAttribute('fill', color)
@@ -8728,7 +8676,7 @@ export default {
         $('#culturesBottom').children().show()
         $('#culturesManuallyButtons').hide()
         $('.selected').removeClass('selected')
-        customization = 0
+        self.customization = 0
         restoreDefaultEvents()
       }
 
@@ -8761,7 +8709,7 @@ export default {
       })
 
       $('#culturesRegenerateNames').on('click', function() {
-        manors.forEach(function(m) {
+        self.manors.forEach(function(m) {
           if (m.region === 'removed') return
           const culture = m.culture
           m.name = generateName(culture)
@@ -8803,8 +8751,8 @@ export default {
         position: {my: 'center', at: 'center', of: 'svg'}
       })
 
-      if (modules.editNamesbase) return
-      modules.editNamesbase = true
+      if (self.modules.editNamesbase) return
+      self.modules.editNamesbase = true
 
       function namesbaseUpdateInputs(selected) {
         const textarea = document.getElementById('namesbaseTextarea')
@@ -8974,18 +8922,18 @@ export default {
     function editLegends(id, name) {
       // update list of objects
       const select = document.getElementById('legendSelect')
-      for (let i = select.options.length; i < notes.length; i++) {
-        let option = new Option(notes[i].id, notes[i].id)
+      for (let i = select.options.length; i < self.notes.length; i++) {
+        let option = new Option(self.notes[i].id, self.notes[i].id)
         select.options.add(option)
       }
 
       // select an object
       if (id) {
-        let note = notes.find(note => note.id === id)
+        let note = self.notes.find(note => note.id === id)
         if (note === undefined) {
           if (!name) name = id
           note = {id, name, legend: ''}
-          notes.push(note)
+          self.notes.push(note)
           let option = new Option(id, id)
           select.options.add(option)
         }
@@ -9001,12 +8949,12 @@ export default {
         position: {my: 'center', at: 'center', of: 'svg'}
       })
 
-      if (modules.editLegends) return
-      modules.editLegends = true
+      if (self.modules.editLegends) return
+      self.modules.editLegends = true
 
       // select another object
       document.getElementById('legendSelect').addEventListener('change', function() {
-        let note = notes.find(note => note.id === this.value)
+        let note = self.notes.find(note => note.id === this.value)
         legendName.value = note.name
         legendText.value = note.legend
       })
@@ -9015,7 +8963,7 @@ export default {
       document.getElementById('legendName').addEventListener('input', function() {
         let select = document.getElementById('legendSelect')
         let id = select.value
-        let note = notes.find(note => note.id === id)
+        let note = self.notes.find(note => note.id === id)
         note.name = this.value
       })
 
@@ -9023,7 +8971,7 @@ export default {
       document.getElementById('legendText').addEventListener('input', function() {
         let select = document.getElementById('legendSelect')
         let id = select.value
-        let note = notes.find(note => note.id === id)
+        let note = self.notes.find(note => note.id === id)
         note.legend = this.value
       })
 
@@ -9075,7 +9023,7 @@ export default {
 
       // download legends object as text file
       document.getElementById('legendDownload').addEventListener('click', function() {
-        const legendString = JSON.stringify(notes)
+        const legendString = JSON.stringify(self.notes)
         const dataBlob = new Blob([legendString], {type: 'text/plain'})
         const url = window.URL.createObjectURL(dataBlob)
         const link = document.createElement('a')
@@ -9095,10 +9043,10 @@ export default {
         fileReader.onload = function(fileLoadedEvent) {
           const dataLoaded = fileLoadedEvent.target.result
           if (dataLoaded) {
-            notes = JSON.parse(dataLoaded)
+            self.notes = JSON.parse(dataLoaded)
             const select = document.getElementById('legendSelect')
             select.options.length = 0
-            editLegends(notes[0].id, notes[0].name)
+            editLegends(self.notes[0].id, self.notes[0].name)
           } else {
             tip('Cannot load a file. Please check the data format')
           }
@@ -9123,14 +9071,14 @@ export default {
 
       function removeLegend() {
         let select = document.getElementById('legendSelect')
-        let index = notes.findIndex(n => n.id === select.value)
-        notes.splice(index, 1)
+        let index = self.notes.findIndex(n => n.id === select.value)
+        self.notes.splice(index, 1)
         select.options.length = 0
-        if (notes.length === 0) {
+        if (self.notes.length === 0) {
           $('#legendEditor').dialog('close')
           return
         }
-        editLegends(notes[0].id, notes[0].name)
+        editLegends(self.notes[0].id, self.notes[0].name)
       }
 
     }
@@ -9148,8 +9096,8 @@ export default {
     // update only UI and sorting value in countryEditor screen
     function updateCountryPopulationUI(s) {
       if ($('#countriesEditor').is(':visible')) {
-        const urban = Math.round(states[s].urbanPopulation * +urbanization.value * populationRate.value)
-        const rural = Math.round(states[s].ruralPopulation * populationRate.value)
+        const urban = Math.round(self.states[s].urbanPopulation * +urbanization.value * populationRate.value)
+        const rural = Math.round(self.states[s].ruralPopulation * populationRate.value)
         const population = (urban + rural) * 1000
         $('#state' + s).attr('data-population', population)
         $('#state' + s).children().filter('.statePopulation').val(si(population))
@@ -9189,19 +9137,19 @@ export default {
     function restoreRegions() {
       borders.selectAll('path').remove()
       removeAllLabelsInGroup('countries')
-      manors.map(function(m) {
-        const cell = diagram.find(m.x, m.y).index
-        if (cells[cell].height < 20) {
+      self.manors.map(function(m) {
+        const cell = self.diagram.find(m.x, m.y).index
+        if (self.cells[cell].height < 20) {
           // remove manor in ocean
           m.region = 'removed'
           m.cell = cell
           d3.selectAll('[data-id=\'' + m.i + '\']').remove()
         } else {
           m.cell = cell
-          cells[cell].manor = m.i
+          self.cells[cell].manor = m.i
         }
       })
-      cells.map(function(c) {
+      self.cells.map(function(c) {
         if (c.height < 20) {
           // no longer a land cell
           delete c.region
@@ -9210,8 +9158,8 @@ export default {
         }
         if (c.region === undefined) {
           c.region = 'neutral'
-          if (states[states.length - 1].capital !== 'neutral') {
-            states.push({i: states.length, color: 'neutral', capital: 'neutral', name: 'Neutrals'})
+          if (self.states[self.states.length - 1].capital !== 'neutral') {
+            self.states.push({i: self.states.length, color: 'neutral', capital: 'neutral', name: 'Neutrals'})
           }
         }
         if (c.culture === undefined) {
@@ -9219,51 +9167,51 @@ export default {
           c.culture = cultureTree.data().indexOf(closest)
         }
       })
-      states.map(function(s) {recalculateStateData(s.i)})
+      self.states.map(function(s) {recalculateStateData(s.i)})
       drawRegions()
     }
 
     function regenerateCountries() {
       regions.selectAll('*').remove()
       const neutral = neutralInput.value = +countriesNeutral.value
-      manors.forEach(function(m) {
+      self.manors.forEach(function(m) {
         if (m.region === 'removed') return
         let state = 'neutral', closest = neutral
-        states.map(function(s) {
+        self.states.map(function(s) {
           if (s.capital === 'neutral' || s.capital === 'select') return
-          const c = manors[s.capital]
+          const c = self.manors[s.capital]
           let dist = Math.hypot(c.x - m.x, c.y - m.y) / s.power
-          if (cells[m.cell].fn !== cells[c.cell].fn) dist *= 3
+          if (self.cells[m.cell].fn !== self.cells[c.cell].fn) dist *= 3
           if (dist < closest) {
             state = s.i
             closest = dist
           }
         })
         m.region = state
-        cells[m.cell].region = state
+        self.cells[m.cell].region = state
       })
 
       defineRegions()
       const temp = regions.append('g').attr('id', 'temp')
-      land.forEach(function(l) {
+      self.land.forEach(function(l) {
         if (l.region === undefined) return
         if (l.region === 'neutral') return
-        const color = states[l.region].color
+        const color = self.states[l.region].color
         temp.append('path')
             .attr('data-cell', l.index).attr('data-state', l.region)
-            .attr('d', 'M' + polygons[l.index].join('L') + 'Z')
+            .attr('d', 'M' + self.polygons[l.index].join('L') + 'Z')
             .attr('fill', color).attr('stroke', color)
       })
-      const neutralCells = $.grep(cells, function(e) {return e.region === 'neutral'})
-      const last = states.length - 1
-      const type = states[last].color
+      const neutralCells = $.grep(self.cells, function(e) {return e.region === 'neutral'})
+      const last = self.states.length - 1
+      const type = self.states[last].color
       if (type === 'neutral' && !neutralCells.length) {
         // remove neutral line
         $('#state' + last).remove()
-        states.splice(-1)
+        self.states.splice(-1)
       }
       // recalculate data for all countries
-      states.map(function(s) {
+      self.states.map(function(s) {
         recalculateStateData(s.i)
         $('#state' + s.i + ' > .stateCells').text(s.cells)
         $('#state' + s.i + ' > .stateBurgs').text(s.burgs)
@@ -9280,8 +9228,8 @@ export default {
       })
       if (type !== 'neutral' && neutralCells.length) {
         // add neutral line
-        states.push({i: states.length, color: 'neutral', capital: 'neutral', name: 'Neutrals'})
-        recalculateStateData(states.length - 1)
+        self.states.push({i: self.states.length, color: 'neutral', capital: 'neutral', name: 'Neutrals'})
+        recalculateStateData(self.states.length - 1)
         editCountries()
       }
     }
@@ -9357,13 +9305,13 @@ export default {
         let message = `Burgs will be renamed as below. Please confirm`
         message +=
           `<div class="overflow-div"><table class="overflow-table"><tr><th>Id</th><th>Current name</th><th>New Name</th></tr>`
-        for (let i = 0; i < data.length && i < manors.length; i++) {
+        for (let i = 0; i < data.length && i < self.manors.length; i++) {
           const v = data[i]
           if (v === '' || v === undefined) {continue}
-          if (v === manors[i].name) {continue}
+          if (v === self.manors[i].name) {continue}
           change.push({i, name: v})
           message +=
-            `<tr><td style="width:20%">${i}</td><td style="width:40%">${manors[i].name}</td><td style="width:40%">${v}</td></tr>`
+            `<tr><td style="width:20%">${i}</td><td style="width:40%">${self.manors[i].name}</td><td style="width:40%">${v}</td></tr>`
         }
         message += `</tr></table></div>`
         alertMessage.innerHTML = message
@@ -9374,7 +9322,7 @@ export default {
             Confirm: function() {
               for (let i = 0; i < change.length; i++) {
                 const id = change[i].i
-                manors[id].name = change[i].name
+                self.manors[id].name = change[i].name
                 labels.select('[data-id=\'' + id + '\']').text(change[i].name)
               }
               $(this).dialog('close')
@@ -9416,7 +9364,7 @@ export default {
     // fit full-screen map if window is resized
     $(window).resize(function(e) {
       // trick to prevent resize on download bar opening
-      if (autoResize === false) return
+      if (self.autoResize === false) return
       mapWidthInput.value = window.innerWidth
       mapHeightInput.value = window.innerHeight
       changeMapSize()
@@ -9441,15 +9389,15 @@ export default {
       if (id === 'hideLabels') invokeActiveZooming()
       if (id === 'mapWidthInput' || id === 'mapHeightInput') {
         changeMapSize()
-        autoResize = false
+        self.autoResize = false
         localStorage.setItem('mapWidth', mapWidthInput.value)
         localStorage.setItem('mapHeight', mapHeightInput.value)
       }
       if (id === 'sizeInput') {
-        graphSize = sizeOutput.value = +this.value
-        if (graphSize === 3) {sizeOutput.style.color = 'red'}
-        if (graphSize === 2) {sizeOutput.style.color = 'yellow'}
-        if (graphSize === 1) {sizeOutput.style.color = 'green'}
+        self.graphSize = sizeOutput.value = +this.value
+        if (self.graphSize === 3) {sizeOutput.style.color = 'red'}
+        if (self.graphSize === 2) {sizeOutput.style.color = 'yellow'}
+        if (self.graphSize === 1) {sizeOutput.style.color = 'green'}
         // localStorage.setItem("graphSize", this.value); - temp off to always start with size 1
       }
       if (id === 'templateInput') {localStorage.setItem('template', this.value)}
@@ -9660,10 +9608,10 @@ export default {
 
     // re-load page with provided seed
     $('#optionsSeedGenerate').on('click', function() {
-      if ($('#optionsSeed').value == seed) return
-      seed = $('#optionsSeed').value
+      if ($('#optionsSeed').value == self.seed) return
+      self.seed = $('#optionsSeed').value
       const url = new URL(window.location.href)
-      window.location.href = url.pathname + '?seed=' + seed
+      window.location.href = url.pathname + '?seed=' + self.seed
     })
 
     // Pull request from @evyatron
